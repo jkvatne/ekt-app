@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_title">Motime EKT tilkobling</string>
+    <string name="app_name">Motime EKT tilkobling</string>
+    <string name="devices">USB Devices</string>
+    <string name="no_driver"><![CDATA[<no driver>]]></string>
+</resources>

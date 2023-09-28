@@ -1,0 +1,7 @@
+include 'usbSerialForAndroid', 'MotimeEktInput'
+
+dependencyResolutionManagement {
+    repositories {
+        maven { url 'https://jitpack.io' }
+    }
+}
