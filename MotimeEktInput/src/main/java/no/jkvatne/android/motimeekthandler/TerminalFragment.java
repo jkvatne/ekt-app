@@ -175,9 +175,6 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
     }
 
     public void onSpool() {
-        receiveText.append("Spooling test, get package 547");
-        GetPackage(547);
-        /*
         AlertDialog.Builder adb = new AlertDialog.Builder(getActivity());
         //adb.setView(alertDialogView);
         adb.setTitle("Vil du laste ned de siste avlesningene?");
@@ -194,7 +191,6 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
             }
         });
         adb.show();
-        */
     }
 
     public void getStatus() {
@@ -320,7 +316,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
             }
             status("connected");
             connected = true;
-            receiveText.append("Just connected, query status\n");
+            //receiveText.append("Just connected, query status\n");
             send("/ST");
         } catch (Exception e) {
             status("connection failed: " + e.getMessage());
@@ -415,8 +411,8 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                 receiveText.append(String.format("Nr %d %d:%02d\n", ektNo,
                         totalTime / 60, totalTime % 60));
 
-                //String url = "https://tid.nook.no/tid.php?a=" + String.valueOf(compressedData);
-                //getUrlContent(url);
+                String url = "https://tid.nook.no/tid.php?a=" + String.valueOf(compressedData);
+                getUrlContent(url);
             } else if (CurrentSize == 55) {
                 receiveText.append(String.format("Status 20%02d-%02d-%02d %02d:%02d:%02d\n",
                         buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
@@ -426,7 +422,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                         + (((int) buf[23] & 0xFF) << 16)+(((int) buf[24] & 0xFF) << 24);
                 prevNo = ((int) buf[25] & 0xFF) + (((int) buf[26] & 0xFF) << 8)
                         + (((int) buf[27] & 0xFF) << 16)+(((int) buf[28] & 0xFF) << 24);
-                receiveText.append(String.format("Siste løp har %d brikker\n", recNo-prevNo));
+                receiveText.append(String.format("Siste løp har %d brikker\n", recNo-prevNo+1));
 
                 // Get current time and compare
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -450,8 +446,8 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                     }
                 }
                 // Re-read last package
-                receiveText.append("Har fått sts, henter nr " + recNo + "\n");
-                GetPackage(recNo);
+                //receiveText.append("Har fått sts, henter nr " + recNo + "\n");
+                //GetPackage(recNo);
 
             } else if (CurrentSize > 0) {
                 receiveText.append(String.format("nextPut=%d  nextGet=%d\n", cbuf.nextPut,
@@ -472,7 +468,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
 
     // SpoolEkt will read all recoerds starting at given number from the MTR3/4.
     void SpoolPackage(int no) {
-        receiveText.append("Henter pakker fra " + no + "\n");
+        receiveText.append("Henter pakker fra nr. " + no + "\n");
         byte[] data = {0x2F, 0x53, 0x42, (byte)(no&0xFF),(byte)((no>>8)&0xFF),
                 (byte)((no>>16)&0xFF), (byte)((no>>24)&0xFF) };
         sendbytes(data);
