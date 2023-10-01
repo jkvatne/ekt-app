@@ -46,7 +46,7 @@
             android:singleLine="true" />
 
         <ImageButton
-            android:id="@+id/sts_btn"
+            android:id="@+id/spool_btn"
             android:layout_width="83dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
@@ -55,7 +55,7 @@
             app:srcCompat="@drawable/baseline_download_24" />
 
         <ImageButton
-            android:id="@+id/spool_btn"
+            android:id="@+id/status_btn"
             android:layout_width="73dp"
             android:layout_height="match_parent"
             android:layout_weight="1"

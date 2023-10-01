@@ -81,7 +81,7 @@ public class DevicesFragment extends ListFragment {
                 false);
         getListView().addHeaderView(header, null, false);
         setEmptyText("<no USB devices found>");
-        ((TextView) getListView().getEmptyView()).setTextSize(18);
+        ((TextView) getListView().getEmptyView()).setTextSize(24);
         setListAdapter(listAdapter);
     }
 

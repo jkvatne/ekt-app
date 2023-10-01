@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
@@ -28,17 +29,19 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
-import com.hoho.android.usbserial.util.HexDump;
 import com.hoho.android.usbserial.util.SerialInputOutputManager;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.io.ByteArrayOutputStream;
+import java.util.concurrent.TimeUnit;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
@@ -66,7 +69,6 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
     private final Handler mainLooper;
     private TextView receiveText;
     //private ControlLines controlLines;
-    private final ByteArrayOutputStream EktBuffer = new ByteArrayOutputStream();
     private int CurrentSize;
     private SerialInputOutputManager usbIoManager;
     private UsbSerialPort usbSerialPort;
@@ -75,7 +77,8 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
     private RequestQueue mRequestQueue;
     private StringRequest mStringRequest;
     private RequestQueue queue;
-
+    private int prevNo;
+    private CircularBuffer cbuf;
     public static String getTagValue(String xml, String tagName){
         return xml.split("<"+tagName+">")[1].split("</"+tagName+">")[0];
     }
@@ -146,6 +149,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         baudRate = 9600; // getArguments().getInt("baud");
         withIoManager = getArguments().getBoolean("withIoManager");
         queue = Volley.newRequestQueue(this.requireActivity());
+        cbuf = new CircularBuffer(2048);
     }
 
     @Override
@@ -170,6 +174,34 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         super.onPause();
     }
 
+    public void onSpool() {
+        receiveText.append("Spooling test, get package 547");
+        GetPackage(547);
+        /*
+        AlertDialog.Builder adb = new AlertDialog.Builder(getActivity());
+        //adb.setView(alertDialogView);
+        adb.setTitle("Vil du laste ned de siste avlesningene?");
+        adb.setIcon(android.R.drawable.ic_dialog_alert);
+        adb.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                // Spool last race
+                SpoolPackage(prevNo);
+            }
+        });
+        adb.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                // Do nothing
+            }
+        });
+        adb.show();
+        */
+    }
+
+    public void getStatus() {
+        receiveText.append("On click handler, get status\n");
+        send("/ST");
+    }
+
     /*
      * UI
      */
@@ -184,9 +216,9 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         receiveText.setMovementMethod(ScrollingMovementMethod.getInstance());
         TextView sendText = view.findViewById(R.id.send_text);
         View spoolBtn = view.findViewById(R.id.spool_btn);
-        spoolBtn.setOnClickListener(v -> send("/ST"));
-        View stsBtn = view.findViewById(R.id.sts_btn);
-        stsBtn.setOnClickListener(v -> send("/ST"));
+        spoolBtn.setOnClickListener(v -> onSpool());
+        View stsBtn = view.findViewById(R.id.status_btn);
+        stsBtn.setOnClickListener(v -> getStatus());
         return view;
     }
 
@@ -200,6 +232,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         int id = item.getItemId();
         if (id == R.id.clear) {
             receiveText.setText("");
+            cbuf.clear();
             return true;
         } else {
             return super.onOptionsItemSelected(item);
@@ -212,7 +245,11 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
     @Override
     public void onNewData(byte[] data) {
         mainLooper.post(() -> {
-            receive(data);
+            try {
+                receive(data);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
         });
     }
 
@@ -283,6 +320,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
             }
             status("connected");
             connected = true;
+            receiveText.append("Just connected, query status\n");
             send("/ST");
         } catch (Exception e) {
             status("connection failed: " + e.getMessage());
@@ -303,6 +341,18 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         usbSerialPort = null;
     }
 
+    private void sendbytes(byte[] data) {
+        if (!connected) {
+            Toast.makeText(getActivity(), "not connected", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            usbSerialPort.write(data, WRITE_WAIT_MILLIS);
+        } catch (Exception e) {
+            onRunError(e);
+        }
+    }
+
     private void send(String str) {
         if (!connected) {
             Toast.makeText(getActivity(), "not connected", Toast.LENGTH_SHORT).show();
@@ -310,14 +360,6 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         }
         try {
             byte[] data = (str).getBytes();
-            /*
-            SpannableStringBuilder spn = new SpannableStringBuilder();
-            spn.append("send ").append(String.valueOf(data.length)).append(" bytes\n");
-            spn.append(HexDump.dumpHexString(data)).append("\n");
-            spn.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorSendText)),
-                    0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            receiveText.append(spn);
-            */
             usbSerialPort.write(data, WRITE_WAIT_MILLIS);
         } catch (Exception e) {
             onRunError(e);
@@ -338,58 +380,102 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
             // like connection loss, so there is typically no exception thrown here on error
             status("connection lost 2" + e.getMessage());
             disconnect();
+        } catch (InterruptedException e) {
+            status("connection lost 3" + e.getMessage());
+            disconnect();
         }
     }
 
     @SuppressLint("DefaultLocale")
-    private void receive(byte[] data) {
-        // Check for new message and reset EktBuffer
-        if ((data.length > 4) && data[0] == -1 && data[1] == -1 && data[2] == -1 && data[3] == -1) {
-            CurrentSize = (int) data[4] & 0xFF;
-            EktBuffer.reset();
-            //EktRxTime = System.currentTimeMillis();
+    private void receive(byte[] data) throws InterruptedException {
+        for (int i=0; i<data.length; i++) {
+            cbuf.put(data[i]);
         }
-        try {
-            EktBuffer.write(data);
-        } catch (java.io.IOException e) {
-            EktBuffer.reset();
-        }
+        //receiveText.append(String.format("Got  %d bytes, cbuf=%d\n", data.length,data.length()));
 
-        // Check for full message
-        if (EktBuffer.size() >= CurrentSize) {
-            byte[] buf = EktBuffer.toByteArray();
+        // Skip to FFFF and check length
+        if (cbuf.foundMessage()) {
+            byte[] buf = new byte[256];
+            int CurrentSize;
+            CurrentSize = (int)cbuf.peek(4)&0xFF;
+            for (int i = 0; i< CurrentSize+4; i++) {
+                buf[i] = cbuf.get();
+            }
+            //receiveText.append("\nHave just extracted package\n");
+            //receiveText.append(String.format("nextPut=%d  nextGet=%d\n", cbuf.nextPut,
+            // cbuf.nextGet));
             if (CurrentSize == 230) {
                 char[] compressedData = new char[256];
                 int totalTime = CompressTag(buf, compressedData);
-                int ektNo =
-                        ((int) buf[20] & 0xFF) + (((int) buf[21] & 0xFF) << 8) + (((int) buf[22] & 0xFF) << 16);
-                receiveText.append(String.format("Ekt %d  tid=%d:%02d\n", ektNo, totalTime / 60,
-                        totalTime % 60));
-                String url = "https://tid.nook.no/tid.php?a=" + String.valueOf(compressedData);
-                //receiveText.append(url+'\n');
-                CurrentSize = 0;
-                getUrlContent(url);
-            } else if (CurrentSize== 55) {
-                receiveText.append("Status pakke\n");
-                receiveText.append(String.format("MTR 20%02d-%02d-%02d %02d:%02d:%02d\n",
+
+                receiveText.append(String.format("%02d-%02d-%02d %02d:%02d:%02d ",
+                        buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
+
+                int ektNo = ((int) buf[20] & 0xFF) + (((int) buf[21] & 0xFF) << 8) + (((int) buf[22] & 0xFF) << 16);
+                receiveText.append(String.format("Nr %d %d:%02d\n", ektNo,
+                        totalTime / 60, totalTime % 60));
+
+                //String url = "https://tid.nook.no/tid.php?a=" + String.valueOf(compressedData);
+                //getUrlContent(url);
+            } else if (CurrentSize == 55) {
+                receiveText.append(String.format("Status 20%02d-%02d-%02d %02d:%02d:%02d\n",
                         buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
                 int recNo = ((int) buf[17] & 0xFF) + (((int) buf[18] & 0xFF) << 8)
                             + (((int) buf[19] & 0xFF) << 16)+(((int) buf[20] & 0xFF) << 24);
-                //receiveText.append(String.format("Siste nr %d\n", recNo));
                 int oldestNo = ((int) buf[21] & 0xFF) + (((int) buf[22] & 0xFF) << 8)
                         + (((int) buf[23] & 0xFF) << 16)+(((int) buf[24] & 0xFF) << 24);
-                int prevNo = ((int) buf[25] & 0xFF) + (((int) buf[26] & 0xFF) << 8)
+                prevNo = ((int) buf[25] & 0xFF) + (((int) buf[26] & 0xFF) << 8)
                         + (((int) buf[27] & 0xFF) << 16)+(((int) buf[28] & 0xFF) << 24);
-                //receiveText.append(String.format("Nest siste nr %d\n", prevNo));
-                receiveText.append(String.format("Siste løp, %d brikker\n", recNo-prevNo));
-                CurrentSize = 0;
+                receiveText.append(String.format("Siste løp har %d brikker\n", recNo-prevNo));
+
+                // Get current time and compare
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    LocalDateTime t = LocalDateTime.now();
+                    int y = t.getYear() % 100;
+                    int mo = t.getMonthValue();
+                    int d = t.getDayOfMonth();
+                    int h = t.getHour();
+                    int mi = t.getMinute();
+                    int s = t.getSecond();
+                    int diff = s-buf[13];
+                    if (diff<0) {
+                        diff += 60;
+                    }
+                    if (y!=buf[8] || mo!=buf[9] || d!=buf[10] || h!=buf[11] || mi!=buf[12] || diff>2) {
+                        receiveText.append("Oppdaterer MTR klokke\n");
+                        send("/SC"+(char)y+(char)mo+(char)d+(char)h+(char)mi+(char)s);
+                        TimeUnit.MILLISECONDS.sleep(100);
+                    } else {
+                        receiveText.append("MTR klokke OK\n\n");
+                    }
+                }
+                // Re-read last package
+                receiveText.append("Har fått sts, henter nr " + recNo + "\n");
+                GetPackage(recNo);
 
             } else if (CurrentSize > 0) {
+                receiveText.append(String.format("nextPut=%d  nextGet=%d\n", cbuf.nextPut,
+                        cbuf.nextGet));
                 receiveText.append("Ukjent pakke med " + CurrentSize + " bytes\n");
                 CurrentSize = 0;
             }
-            EktBuffer.reset();
         }
+    }
+
+    // GetEkt will read one record from the MTR3/4.
+    void GetPackage(int no) {
+        // Sending /GBxxxx with binary x
+        byte[] data = {0x2F, 0x47, 0x42, (byte)(no&0xFF),(byte)((no>>8)&0xFF),(byte)((no>>16)&0xFF),
+                (byte)((no>>24)&0xFF) };
+        sendbytes(data);
+    }
+
+    // SpoolEkt will read all recoerds starting at given number from the MTR3/4.
+    void SpoolPackage(int no) {
+        receiveText.append("Henter pakker fra " + no + "\n");
+        byte[] data = {0x2F, 0x53, 0x42, (byte)(no&0xFF),(byte)((no>>8)&0xFF),
+                (byte)((no>>16)&0xFF), (byte)((no>>24)&0xFF) };
+        sendbytes(data);
     }
 
     void status(String str) {
