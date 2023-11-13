@@ -79,6 +79,10 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
     private RequestQueue queue;
     private int prevNo;
     private CircularBuffer cbuf;
+
+    private String ServerUrl  = "https://tid.nook.no/tid.php?a=";
+
+
     public static String getTagValue(String xml, String tagName){
         return xml.split("<"+tagName+">")[1].split("</"+tagName+">")[0];
     }
@@ -150,6 +154,8 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         withIoManager = getArguments().getBoolean("withIoManager");
         queue = Volley.newRequestQueue(this.requireActivity());
         cbuf = new CircularBuffer(2048);
+        byte[] pwd = BuildConfig.SERVER_URL.getBytes();
+        ServerUrl = pwd.toString();
     }
 
     @Override
@@ -410,8 +416,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                 int ektNo = ((int) buf[20] & 0xFF) + (((int) buf[21] & 0xFF) << 8) + (((int) buf[22] & 0xFF) << 16);
                 receiveText.append(String.format("Nr %d %d:%02d\n", ektNo,
                         totalTime / 60, totalTime % 60));
-
-                String url = "https://tid.nook.no/tid.php?a=" + String.valueOf(compressedData);
+                String url =  ServerUrl + String.valueOf(compressedData);
                 getUrlContent(url);
             } else if (CurrentSize == 55) {
                 receiveText.append(String.format("Status 20%02d-%02d-%02d %02d:%02d:%02d\n",

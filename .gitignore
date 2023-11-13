@@ -41,3 +41,7 @@ local.properties
 *.DS_Store
 proguard/
 jacoco.exec
+
+# Ignore the server url and API key
+# This file should be added localy and not commited to repo.
+apikey.properties
