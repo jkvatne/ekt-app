@@ -30,6 +30,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
@@ -159,7 +160,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
-        setRetainInstance(true);
+        //setRetainInstance(true);
         assert getArguments() != null;
         deviceId = getArguments().getInt("device");
         portNum = getArguments().getInt("port");
@@ -174,8 +175,8 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
     @Override
     public void onResume() {
         super.onResume();
-        requireActivity().registerReceiver(broadcastReceiver,
-                new IntentFilter(INTENT_ACTION_GRANT_USB), Context.RECEIVER_EXPORTED);
+        ContextCompat.registerReceiver(requireContext(), broadcastReceiver,
+                new IntentFilter(INTENT_ACTION_GRANT_USB), ContextCompat.RECEIVER_EXPORTED);
         //status("resume");
         if (!connected) {
             if (usbPermission == UsbPermission.Unknown || usbPermission == UsbPermission.Granted)
