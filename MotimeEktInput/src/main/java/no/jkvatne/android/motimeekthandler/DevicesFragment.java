@@ -50,11 +50,6 @@ public class DevicesFragment extends ListFragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
-
-        View view = requireActivity().getLayoutInflater().inflate(R.layout.activity_main,
-                null,
-                false);
-
         listAdapter = new ArrayAdapter<ListItem>(requireActivity(), 0, listItems) {
             @SuppressLint("SetTextI18n")
             @NonNull
@@ -65,9 +60,9 @@ public class DevicesFragment extends ListFragment {
                     view = requireActivity().getLayoutInflater().inflate(R.layout.device_list_item, parent, false);
                 TextView text1 = view.findViewById(R.id.text1);
                 TextView text2 = view.findViewById(R.id.text2);
-                if(item.driver == null)
+                if(item.driver == null) {
                     text1.setText(R.string.no_driver);
-                else if(item.driver.getPorts().size() == 1)
+                } else if(item.driver.getPorts().size() == 1)
                     text1.setText(item.driver.getClass().getSimpleName().replace("SerialDriver",""));
                 else
                     text1.setText(item.driver.getClass().getSimpleName().replace("SerialDriver","")+", Port "+item.port);

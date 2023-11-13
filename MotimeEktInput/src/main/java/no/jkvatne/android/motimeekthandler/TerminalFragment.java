@@ -199,7 +199,6 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
             return;
         }
         AlertDialog.Builder adb = new AlertDialog.Builder(getActivity());
-        //adb.setView(alertDialogView);
         adb.setTitle(getString(R.string.do_download));
         adb.setIcon(android.R.drawable.ic_dialog_alert);
         adb.setPositiveButton(android.R.string.ok, (dialog, which) -> {
@@ -411,10 +410,9 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
 
     @SuppressLint("DefaultLocale")
     private void receive(byte[] data) throws InterruptedException {
-        for (int i=0; i<data.length; i++) {
-            cbuf.put(data[i]);
+        for (byte datum : data) {
+            cbuf.put(datum);
         }
-        //receiveText.append(String.format("Got  %d bytes, cbuf=%d\n", data.length,data.length()));
 
         // Skip to FFFF and check length
         if (cbuf.foundMessage()) {
@@ -424,9 +422,6 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
             for (int i = 0; i< CurrentSize+4; i++) {
                 buf[i] = cbuf.get();
             }
-            //receiveText.append("\nHave just extracted package\n");
-            //receiveText.append(String.format("nextPut=%d  nextGet=%d\n", cbuf.nextPut,
-            // cbuf.nextGet));
             if (CurrentSize == 230) {
                 char[] compressedData = new char[256];
                 int totalTime = CompressTag(buf, compressedData);
@@ -451,25 +446,23 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                 receiveText.append(String.format("Siste løp har %d brikker\n", recNo-prevNo+1));
 
                 // Get current time and compare
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    LocalDateTime t = LocalDateTime.now();
-                    int y = t.getYear() % 100;
-                    int mo = t.getMonthValue();
-                    int d = t.getDayOfMonth();
-                    int h = t.getHour();
-                    int mi = t.getMinute();
-                    int s = t.getSecond();
-                    int diff = s-buf[13];
-                    if (diff<0) {
-                        diff += 60;
-                    }
-                    if (y!=buf[8] || mo!=buf[9] || d!=buf[10] || h!=buf[11] || mi!=buf[12] || diff>2) {
-                        receiveText.append("Oppdaterer MTR klokke\n");
-                        send("/SC"+(char)y+(char)mo+(char)d+(char)h+(char)mi+(char)s);
-                        TimeUnit.MILLISECONDS.sleep(100);
-                    } else {
-                        receiveText.append("MTR klokke OK\n\n");
-                    }
+                LocalDateTime t = LocalDateTime.now();
+                int y = t.getYear() % 100;
+                int mo = t.getMonthValue();
+                int d = t.getDayOfMonth();
+                int h = t.getHour();
+                int mi = t.getMinute();
+                int s = t.getSecond();
+                int diff = s-buf[13];
+                if (diff<0) {
+                    diff += 60;
+                }
+                if (y!=buf[8] || mo!=buf[9] || d!=buf[10] || h!=buf[11] || mi!=buf[12] || diff>2) {
+                    receiveText.append("Oppdaterer MTR klokke\n");
+                    send("/SC"+(char)y+(char)mo+(char)d+(char)h+(char)mi+(char)s);
+                    TimeUnit.MILLISECONDS.sleep(100);
+                } else {
+                    receiveText.append("MTR klokke OK\n\n");
                 }
             } else if (CurrentSize > 0) {
                 receiveText.append(String.format("nextPut=%d  nextGet=%d\n", cbuf.nextPut,
