@@ -187,7 +187,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
     @Override
     public void onPause() {
         if (connected) {
-            status("pause");
+            //status("pause");
             disconnect();
         }
         requireActivity().unregisterReceiver(broadcastReceiver);
@@ -200,18 +200,14 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         }
         AlertDialog.Builder adb = new AlertDialog.Builder(getActivity());
         //adb.setView(alertDialogView);
-        adb.setTitle("Vil du laste ned de siste avlesningene?");
+        adb.setTitle(getString(R.string.do_download));
         adb.setIcon(android.R.drawable.ic_dialog_alert);
-        adb.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int which) {
-                // Spool last race
-                SpoolPackage(prevNo);
-            }
+        adb.setPositiveButton(android.R.string.ok, (dialog, which) -> {
+            // Spool last race
+            SpoolPackage(prevNo);
         });
-        adb.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int which) {
-                // Do nothing
-            }
+        adb.setNegativeButton(android.R.string.cancel, (dialog, which) -> {
+            // Do nothing
         });
         adb.show();
     }
@@ -300,7 +296,8 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
             device = v;
         }
         if (device == null) {
-            status("connection failed: device not found");
+            //status("connection failed: device not found");
+            status(getString(R.string.connection_failed));
             return;
         }
         UsbSerialDriver driver = UsbSerialProber.getDefaultProber().probeDevice(device);
@@ -308,29 +305,29 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
             driver = CustomProber.getCustomProber().probeDevice(device);
         }
         if (driver == null) {
-            status("connection failed: no driver for device");
+            //status("connection failed: no driver for device");
+            status(getString(R.string.connection_failed));
             return;
         }
         if (driver.getPorts().size() < portNum) {
-            status("connection failed: not enough ports at device");
+            //status("connection failed: not enough ports at device");
+            status(getString(R.string.connection_failed));
             return;
         }
         usbSerialPort = driver.getPorts().get(portNum);
         UsbDeviceConnection usbConnection = usbManager.openDevice(driver.getDevice());
         if (usbConnection == null && usbPermission == UsbPermission.Unknown && !usbManager.hasPermission(driver.getDevice())) {
             usbPermission = UsbPermission.Requested;
-            int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ?
-                    PendingIntent.FLAG_MUTABLE : 0;
             PendingIntent usbPermissionIntent = PendingIntent.getBroadcast(getActivity(), 0,
-                    new Intent(INTENT_ACTION_GRANT_USB), flags);
+                    new Intent(INTENT_ACTION_GRANT_USB), PendingIntent.FLAG_MUTABLE);
             usbManager.requestPermission(driver.getDevice(), usbPermissionIntent);
             return;
         }
         if (usbConnection == null) {
             if (!usbManager.hasPermission(driver.getDevice()))
-                status("connection failed: permission denied");
+                status(getString(R.string.perm_missing));
             else
-                status("connection failed: open failed");
+                status(getString(R.string.connection_failed));
             return;
         }
 
@@ -339,17 +336,17 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
             try {
                 usbSerialPort.setParameters(baudRate, 8, 1, UsbSerialPort.PARITY_NONE);
             } catch (UnsupportedOperationException e) {
-                status("unsupport setparameters");
+                status(getString(R.string.unsupported_parameters));
             }
             if (withIoManager) {
                 usbIoManager = new SerialInputOutputManager(usbSerialPort, this);
                 usbIoManager.start();
             }
-            status("USB tilkoblet");
+            status(getString(R.string.usb_connected));
             connected = true;
             send("/ST");
         } catch (Exception e) {
-            status("connection failed: " + e.getMessage());
+            status(getString(R.string.connection_failed) + e.getMessage());
             disconnect();
         }
     }
