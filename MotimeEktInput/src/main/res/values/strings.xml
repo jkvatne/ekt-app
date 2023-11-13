@@ -4,4 +4,7 @@
     <string name="app_name">Motime EKT tilkobling</string>
     <string name="devices">USB Devices</string>
     <string name="no_driver"><![CDATA[<no driver>]]></string>
+    <string name="server_ok">Web server OK</string>
+    <string name="status_text">Status text</string>
+    <string name="url_error">Appens URL er feil!\n(Sjekk apikey.properties)\n</string>
 </resources>

@@ -50,6 +50,11 @@ public class DevicesFragment extends ListFragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
+
+        View view = requireActivity().getLayoutInflater().inflate(R.layout.activity_main,
+                null,
+                false);
+
         listAdapter = new ArrayAdapter<ListItem>(requireActivity(), 0, listItems) {
             @SuppressLint("SetTextI18n")
             @NonNull
@@ -130,6 +135,10 @@ public class DevicesFragment extends ListFragment {
     }
 
     void refresh() {
+
+        View view = requireActivity().getLayoutInflater().inflate(
+                R.layout.activity_main,null,false);
+
         UsbManager usbManager =
                 (UsbManager) requireActivity().getSystemService(Context.USB_SERVICE);
         UsbSerialProber usbDefaultProber = UsbSerialProber.getDefaultProber();

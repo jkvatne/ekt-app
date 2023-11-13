@@ -38,6 +38,7 @@ import com.hoho.android.usbserial.driver.UsbSerialProber;
 import com.hoho.android.usbserial.util.SerialInputOutputManager;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.io.ByteArrayOutputStream;
@@ -68,21 +69,16 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
     private final BroadcastReceiver broadcastReceiver;
     private final Handler mainLooper;
     private TextView receiveText;
-    //private ControlLines controlLines;
-    private int CurrentSize;
+    private TextView sendText;
     private SerialInputOutputManager usbIoManager;
     private UsbSerialPort usbSerialPort;
     private UsbPermission usbPermission = UsbPermission.Unknown;
     private boolean connected = false;
-    private RequestQueue mRequestQueue;
-    private StringRequest mStringRequest;
     private RequestQueue queue;
     private int prevNo;
     private CircularBuffer cbuf;
-
-    private String ServerUrl  = "https://tid.nook.no/tid.php?a=";
-
-
+    private String ServerUrl  = "<loaded from apikey.properties by gradle>";
+    private boolean noWeb = true;
     public static String getTagValue(String xml, String tagName){
         return xml.split("<"+tagName+">")[1].split("</"+tagName+">")[0];
     }
@@ -95,7 +91,6 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
             new Response.Listener<String>() {
                 @Override
                 public void onResponse(String response) {
-                    //receiveText.append(response+"\n");
                     try {
                         receiveText.append("Klasse:"+getTagValue(response, "class")+" ");
                         int failed = Integer.parseInt(getTagValue(response,"failed"));
@@ -139,6 +134,24 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         mainLooper = new Handler(Looper.getMainLooper());
     }
 
+    public void verifyServer(){
+        // Request a string response from the provided URL.
+        StringRequest stringRequest = new StringRequest(
+                Request.Method.GET,
+                ServerUrl+"ack=1",
+                response -> {
+                    try {
+                        receiveText.append(getText(R.string.server_ok));
+                        receiveText.append(" \n\n");
+                    } catch (Exception e) {
+                        receiveText.append("Exception "+response);
+                    }
+                },
+                error -> receiveText.append("Error response "+error+"\n")
+        );
+        queue.add(stringRequest);
+}
+
     /*
      * Lifecycle
      */
@@ -154,15 +167,15 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         withIoManager = getArguments().getBoolean("withIoManager");
         queue = Volley.newRequestQueue(this.requireActivity());
         cbuf = new CircularBuffer(2048);
-        byte[] pwd = BuildConfig.SERVER_URL.getBytes();
-        ServerUrl = pwd.toString();
+        byte[] buf = BuildConfig.SERVER_URL.getBytes();
+        ServerUrl = new String(buf, StandardCharsets.UTF_8);
     }
 
     @Override
     public void onResume() {
         super.onResume();
         requireActivity().registerReceiver(broadcastReceiver,
-                new IntentFilter(INTENT_ACTION_GRANT_USB));
+                new IntentFilter(INTENT_ACTION_GRANT_USB), Context.RECEIVER_EXPORTED);
         //status("resume");
         if (!connected) {
             if (usbPermission == UsbPermission.Unknown || usbPermission == UsbPermission.Granted)
@@ -174,13 +187,16 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
     public void onPause() {
         if (connected) {
             status("pause");
-            //disconnect();
+            disconnect();
         }
         requireActivity().unregisterReceiver(broadcastReceiver);
         super.onPause();
     }
 
     public void onSpool() {
+        if (noWeb) {
+            return;
+        }
         AlertDialog.Builder adb = new AlertDialog.Builder(getActivity());
         //adb.setView(alertDialogView);
         adb.setTitle("Vil du laste ned de siste avlesningene?");
@@ -200,7 +216,6 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
     }
 
     public void getStatus() {
-        receiveText.append("On click handler, get status\n");
         send("/ST");
     }
 
@@ -216,7 +231,13 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         receiveText.setTextColor(getResources().getColor(R.color.colorRecieveText)); // set as
         // default color to reduce number of spans
         receiveText.setMovementMethod(ScrollingMovementMethod.getInstance());
-        TextView sendText = view.findViewById(R.id.send_text);
+        if (!ServerUrl.startsWith("http")) {
+            receiveText.setText(R.string.url_error);
+            noWeb = true;
+        } else {
+            noWeb = false;
+            verifyServer();
+        }
         View spoolBtn = view.findViewById(R.id.spool_btn);
         spoolBtn.setOnClickListener(v -> onSpool());
         View stsBtn = view.findViewById(R.id.status_btn);
@@ -268,6 +289,9 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
      */
     private void connect() {
         int id = 0;
+        if (noWeb) {
+            return;
+        }
         UsbDevice device = null;
         UsbManager usbManager = (UsbManager) requireActivity().getSystemService(Context.USB_SERVICE);
         for (UsbDevice v : usbManager.getDeviceList().values()) {
@@ -320,9 +344,8 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                 usbIoManager = new SerialInputOutputManager(usbSerialPort, this);
                 usbIoManager.start();
             }
-            status("connected");
+            status("USB tilkoblet");
             connected = true;
-            //receiveText.append("Just connected, query status\n");
             send("/ST");
         } catch (Exception e) {
             status("connection failed: " + e.getMessage());
@@ -416,7 +439,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                 int ektNo = ((int) buf[20] & 0xFF) + (((int) buf[21] & 0xFF) << 8) + (((int) buf[22] & 0xFF) << 16);
                 receiveText.append(String.format("Nr %d %d:%02d\n", ektNo,
                         totalTime / 60, totalTime % 60));
-                String url =  ServerUrl + String.valueOf(compressedData);
+                String url =  ServerUrl + "a=" + String.valueOf(compressedData);
                 getUrlContent(url);
             } else if (CurrentSize == 55) {
                 receiveText.append(String.format("Status 20%02d-%02d-%02d %02d:%02d:%02d\n",
@@ -450,10 +473,6 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                         receiveText.append("MTR klokke OK\n\n");
                     }
                 }
-                // Re-read last package
-                //receiveText.append("Har fått sts, henter nr " + recNo + "\n");
-                //GetPackage(recNo);
-
             } else if (CurrentSize > 0) {
                 receiveText.append(String.format("nextPut=%d  nextGet=%d\n", cbuf.nextPut,
                         cbuf.nextGet));
