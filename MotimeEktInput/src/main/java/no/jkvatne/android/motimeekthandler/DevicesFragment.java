@@ -10,6 +10,8 @@ import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.ListFragment;
+
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -27,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Locale;
 
 public class DevicesFragment extends ListFragment {
+    View header;
 
     static class ListItem {
         final UsbDevice device;
@@ -75,7 +78,6 @@ public class DevicesFragment extends ListFragment {
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
         setListAdapter(null);
-        //p = this.getParentFragment();
         View header = requireActivity().getLayoutInflater().inflate(R.layout.device_list_header,
                 null,
                 false);
