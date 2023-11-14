@@ -28,11 +28,11 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
         Objects.requireNonNull(getSupportActionBar()).setDisplayHomeAsUpEnabled(getSupportFragmentManager().getBackStackEntryCount()>0);
     }
 
-    //@Override
-    //public boolean onSupportNavigateUp() {
-    //    onBackPressed();
-    //    return true;
-    //}
+    @Override
+    public boolean onSupportNavigateUp() {
+        this.getOnBackPressedDispatcher().onBackPressed();
+        return true;
+    }
 
     @Override
     protected void onNewIntent(Intent intent) {
