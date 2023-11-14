@@ -4,13 +4,11 @@ import android.annotation.SuppressLint;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -41,14 +39,10 @@ import com.hoho.android.usbserial.util.SerialInputOutputManager;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.io.ByteArrayOutputStream;
 import java.util.concurrent.TimeUnit;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
-import com.android.volley.Response;
-import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 
@@ -62,22 +56,18 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
 
     private static final String INTENT_ACTION_GRANT_USB = BuildConfig.APPLICATION_ID + ".GRANT_USB";
     private static final int WRITE_WAIT_MILLIS = 2000;
-    private static final int READ_WAIT_MILLIS = 200;
-
-    private int deviceId, portNum, baudRate;
+    private int portNum, baudRate;
     private boolean withIoManager;
-
     private final BroadcastReceiver broadcastReceiver;
     private final Handler mainLooper;
     private TextView receiveText;
-    private TextView sendText;
     private SerialInputOutputManager usbIoManager;
     private UsbSerialPort usbSerialPort;
     private UsbPermission usbPermission = UsbPermission.Unknown;
     private boolean connected = false;
     private RequestQueue queue;
     private int prevNo;
-    private CircularBuffer cbuf;
+    private CircularBuffer cBuf;
     private String ServerUrl  = "<loaded from apikey.properties by gradle>";
     private boolean noWeb = true;
     public static String getTagValue(String xml, String tagName){
@@ -89,9 +79,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         StringRequest stringRequest = new StringRequest(
             Request.Method.GET,
             url,
-            new Response.Listener<String>() {
-                @Override
-                public void onResponse(String response) {
+                response -> {
                     try {
                         receiveText.append("Klasse:"+getTagValue(response, "class")+" ");
                         int failed = Integer.parseInt(getTagValue(response,"failed"));
@@ -108,14 +96,8 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                     }
                     // Blank line between reports
                     receiveText.append("\n");
-                }
-            },
-            new Response.ErrorListener() {
-                @Override
-                public void onErrorResponse(VolleyError error) {
-                    receiveText.append("Errror\n");
-                }
-            }
+                },
+                error -> receiveText.append("Errror\n")
         );
         queue.add(stringRequest);
     }
@@ -162,12 +144,12 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         setHasOptionsMenu(true);
         //setRetainInstance(true);
         assert getArguments() != null;
-        deviceId = getArguments().getInt("device");
+        //deviceId = getArguments().getInt("device");
         portNum = getArguments().getInt("port");
         baudRate = 9600; // getArguments().getInt("baud");
         withIoManager = getArguments().getBoolean("withIoManager");
         queue = Volley.newRequestQueue(this.requireActivity());
-        cbuf = new CircularBuffer(2048);
+        cBuf = new CircularBuffer(2048);
         byte[] buf = BuildConfig.SERVER_URL.getBytes();
         ServerUrl = new String(buf, StandardCharsets.UTF_8);
     }
@@ -198,7 +180,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         if (noWeb) {
             return;
         }
-        AlertDialog.Builder adb = new AlertDialog.Builder(getActivity());
+        AlertDialog.Builder adb = new AlertDialog.Builder(requireActivity());
         adb.setTitle(getString(R.string.do_download));
         adb.setIcon(android.R.drawable.ic_dialog_alert);
         adb.setPositiveButton(android.R.string.ok, (dialog, which) -> {
@@ -224,8 +206,8 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         View view = inflater.inflate(R.layout.fragment_terminal, container, false);
         receiveText = view.findViewById(R.id.receive_text);                          // TextView
         // performance decreases with number of spans
-        receiveText.setTextColor(getResources().getColor(R.color.colorRecieveText)); // set as
-        // default color to reduce number of spans
+        // set as default color to reduce number of spans
+        receiveText.setTextColor(ContextCompat.getColor(requireContext(), R.color.colorRecieveText));
         receiveText.setMovementMethod(ScrollingMovementMethod.getInstance());
         if (!ServerUrl.startsWith("http")) {
             receiveText.setText(R.string.url_error);
@@ -251,7 +233,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         int id = item.getItemId();
         if (id == R.id.clear) {
             receiveText.setText("");
-            cbuf.clear();
+            cBuf.clear();
             return true;
         } else {
             return super.onOptionsItemSelected(item);
@@ -284,14 +266,13 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
      * Serial + UI
      */
     private void connect() {
-        int id = 0;
         if (noWeb) {
             return;
         }
         UsbDevice device = null;
         UsbManager usbManager = (UsbManager) requireActivity().getSystemService(Context.USB_SERVICE);
         for (UsbDevice v : usbManager.getDeviceList().values()) {
-            deviceId = v.getDeviceId();
+            //deviceId = v.getDeviceId();
             device = v;
         }
         if (device == null) {
@@ -388,39 +369,19 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         }
     }
 
-    private void read() {
-        if (!connected) {
-            Toast.makeText(getActivity(), "not connected", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        try {
-            byte[] buffer = new byte[8192];
-            int len = usbSerialPort.read(buffer, READ_WAIT_MILLIS);
-            receive(Arrays.copyOf(buffer, len));
-        } catch (IOException e) {
-            // when using read with timeout, USB bulkTransfer returns -1 on timeout _and_ errors
-            // like connection loss, so there is typically no exception thrown here on error
-            status("connection lost 2" + e.getMessage());
-            disconnect();
-        } catch (InterruptedException e) {
-            status("connection lost 3" + e.getMessage());
-            disconnect();
-        }
-    }
-
     @SuppressLint("DefaultLocale")
     private void receive(byte[] data) throws InterruptedException {
         for (byte datum : data) {
-            cbuf.put(datum);
+            cBuf.put(datum);
         }
 
         // Skip to FFFF and check length
-        if (cbuf.foundMessage()) {
+        if (cBuf.foundMessage()) {
             byte[] buf = new byte[256];
             int CurrentSize;
-            CurrentSize = (int)cbuf.peek(4)&0xFF;
+            CurrentSize = (int) cBuf.peek(4)&0xFF;
             for (int i = 0; i< CurrentSize+4; i++) {
-                buf[i] = cbuf.get();
+                buf[i] = cBuf.get();
             }
             if (CurrentSize == 230) {
                 char[] compressedData = new char[256];
@@ -439,8 +400,8 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                         buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
                 int recNo = ((int) buf[17] & 0xFF) + (((int) buf[18] & 0xFF) << 8)
                             + (((int) buf[19] & 0xFF) << 16)+(((int) buf[20] & 0xFF) << 24);
-                int oldestNo = ((int) buf[21] & 0xFF) + (((int) buf[22] & 0xFF) << 8)
-                        + (((int) buf[23] & 0xFF) << 16)+(((int) buf[24] & 0xFF) << 24);
+                //int oldestNo = ((int) buf[21] & 0xFF) + (((int) buf[22] & 0xFF) << 8)
+                //        + (((int) buf[23] & 0xFF) << 16)+(((int) buf[24] & 0xFF) << 24);
                 prevNo = ((int) buf[25] & 0xFF) + (((int) buf[26] & 0xFF) << 8)
                         + (((int) buf[27] & 0xFF) << 16)+(((int) buf[28] & 0xFF) << 24);
                 receiveText.append(String.format("Siste løp har %d brikker\n", recNo-prevNo+1));
@@ -465,10 +426,9 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                     receiveText.append("MTR klokke OK\n\n");
                 }
             } else if (CurrentSize > 0) {
-                receiveText.append(String.format("nextPut=%d  nextGet=%d\n", cbuf.nextPut,
-                        cbuf.nextGet));
+                receiveText.append(String.format("nextPut=%d  nextGet=%d\n", cBuf.nextPut,
+                        cBuf.nextGet));
                 receiveText.append("Ukjent pakke med " + CurrentSize + " bytes\n");
-                CurrentSize = 0;
             }
         }
     }
@@ -491,7 +451,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
 
     void status(String str) {
         SpannableStringBuilder spn = new SpannableStringBuilder(str + '\n');
-        spn.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorStatusText)), 0,
+        spn.setSpan(new ForegroundColorSpan(ContextCompat.getColor(requireContext(),R.color.colorStatusText)), 0,
                 spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         receiveText.append(spn);
     }
@@ -501,7 +461,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
             x = 256+x;
         }
         x = x & 0x3F;
-        return (char)b64chars[x];
+        return b64chars[x];
     }
 
     private int bb(byte[] brikke_buffer, int i) {
@@ -511,14 +471,14 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
 
     int CompressTag(byte[] brikke_buffer, char[] compressedData) {
         int pos = 0;
-        int i = 0;
+        int i;
         int prev_tid = 0;
         int totalTime = 0;
         //byte[] compressedData = new byte[256];
         // Protokollnummer er første byte
         compressedData[pos++] = b64(49);
         // Batterispenning, 1 tegn (x=0..63 = spenning/0.1 = 0..=6.3V
-        int bv = (int)63;
+        int bv = 63;
         compressedData[pos++] = b64(bv);
         // Avlest tid, 5 tegn, år modulo 16, |YYYYMM|MMDDDD|DHHHHH|MMMMMM|SSSSSS
         // Year is years after 1900 mod 16, so 2022 is 10 (0xA). Add 2012
@@ -549,22 +509,20 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         // Control codes
         for (i = 0; i < 50; i++) {
             int post = bb(brikke_buffer,3 * i + 26);
-            int posttid = ((int) bb(brikke_buffer,27 + 3 * i) & 0xFF) + (((int) bb(brikke_buffer,28 + 3 * i) & 0xFF) << 8);
+            int posttid = (bb(brikke_buffer,27 + 3 * i) & 0xFF) + ((bb(brikke_buffer,28 + 3 * i) & 0xFF) << 8);
             int tid = posttid - prev_tid;
             prev_tid = posttid;
             if (i > 0 && post == 0) break;
             if (tid <= 511) {
                 // |0ttttt|ttttpp|pppppp|
                 compressedData[pos++] =b64((tid >> 4) & 0x1f);
-                compressedData[pos++] =b64(((post >> 6) & 0x03) | ((tid & 0x0f) << 2));
-                compressedData[pos++] =b64((post & 0x3F));
             } else {
                 // |1ttttt|tttttt|ttttpp|pppppp|
                 compressedData[pos++] =b64(32 | ((tid >> 10) & 0x1F));
                 compressedData[pos++] =b64(((tid >> 4) & 0x3F));
-                compressedData[pos++] =b64(((post >> 6) & 0x03) | ((tid & 0x0f) << 2));
-                compressedData[pos++] =b64((post & 0x3F));
             }
+            compressedData[pos++] =b64(((post >> 6) & 0x03) | ((tid & 0x0f) << 2));
+            compressedData[pos++] =b64((post & 0x3F));
             if (post < 250) {
                 totalTime = posttid;
             }
@@ -580,7 +538,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         }
         compressedData[pos++] =b64(checksum & 0x3F);
         compressedData[pos++] =b64((checksum >> 6) & 0x3F);
-        compressedData[pos++] = 0; //String termination
+        compressedData[pos] = 0; //String termination
         return totalTime;
     }
 }

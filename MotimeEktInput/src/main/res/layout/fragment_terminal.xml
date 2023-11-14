@@ -37,21 +37,13 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-        <EditText
-            android:id="@+id/send_text"
-            android:layout_width="252dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:inputType="text|textNoSuggestions"
-            android:singleLine="true" />
-
         <ImageButton
             android:id="@+id/spool_btn"
             android:layout_width="83dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@color/colorPrimary"
-            android:contentDescription="Last ned dagens løp"
+            android:contentDescription="@string/download"
             app:srcCompat="@drawable/baseline_download_24" />
 
         <ImageButton
@@ -60,7 +52,7 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@color/colorSendText"
-            android:contentDescription="Status"
+            android:contentDescription="@text/status"
             app:srcCompat="@drawable/baseline_check_24" />
     </LinearLayout>
 

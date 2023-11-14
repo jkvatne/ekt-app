@@ -25,14 +25,13 @@ import com.hoho.android.usbserial.driver.UsbSerialProber;
 
 import java.util.ArrayList;
 import java.util.Locale;
-import java.util.Objects;
 
 public class DevicesFragment extends ListFragment {
 
     static class ListItem {
-        UsbDevice device;
-        int port;
-        UsbSerialDriver driver;
+        final UsbDevice device;
+        final int port;
+        final UsbSerialDriver driver;
 
         ListItem(UsbDevice device, int port, UsbSerialDriver driver) {
             this.device = device;
@@ -76,6 +75,7 @@ public class DevicesFragment extends ListFragment {
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
         setListAdapter(null);
+        //p = this.getParentFragment();
         View header = requireActivity().getLayoutInflater().inflate(R.layout.device_list_header,
                 null,
                 false);
@@ -130,10 +130,8 @@ public class DevicesFragment extends ListFragment {
     }
 
     void refresh() {
-
-        View view = requireActivity().getLayoutInflater().inflate(
-                R.layout.activity_main,null,false);
-
+        //View view = requireActivity().getLayoutInflater().inflate(
+        //        R.layout.activity_main,null,false);
         UsbManager usbManager =
                 (UsbManager) requireActivity().getSystemService(Context.USB_SERVICE);
         UsbSerialProber usbDefaultProber = UsbSerialProber.getDefaultProber();

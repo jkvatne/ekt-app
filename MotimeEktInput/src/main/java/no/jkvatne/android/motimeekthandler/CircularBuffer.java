@@ -1,8 +1,5 @@
 package no.jkvatne.android.motimeekthandler;
 
-import java.io.EOFException;
-import java.nio.BufferOverflowException;
-
 public class CircularBuffer
 {
 
