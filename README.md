@@ -10,10 +10,10 @@ available since Android 3.1 and working reliably since Android 4.2.
 No root access, ADK, or special kernel drivers are required; all drivers are implemented in
 Java using the library at https://github.com/mik3y/usb-serial-for-android
 
-#Licence
+## Licence
 The library is published under the MIT Licence, as is this app. This means you are free to use and modify it as you like
 
-#Installation
+## Installation
 No precompiled APK is available. You have to compile and install the program yourself.
 For this, you have to use Android Studio, which is free.
 
@@ -26,7 +26,7 @@ SERVER_URL = "https://my.domain.com/myprogram.php?pw=mypassword&"
 
 The EKT data is appended in compressed format. See the code for details.
 
-#Warning
+## Warning
 
 This is Alpha software, and have not been tested much. The plan is to add support for the latest EKT Readers, but currently only MTR4 and erlier types are supported.
 
