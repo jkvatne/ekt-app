@@ -1,0 +1,22 @@
+# Default to lf allways.
+* text=auto
+
+# These files are text and should be normalized (convert auto =&gt; lf)
+*.c       text eol=auto
+*.h       text eol=auto
+*.gld     text eol=auto
+*.bat     text eol=auto
+*.txt     text eol=auto
+*.s       text eol=auto
+*.py      text eol=auto
+*.java    text eol=auto
+.splintrc text eol=auto
+.gradle   text eol=auto        
+
+# Images should be treated as binary
+# (binary is a macro for -text -diff)
+*.png     binary
+*.jpg     binary
+*.gif     binary
+*.sht     binary
+
