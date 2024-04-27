@@ -22,6 +22,8 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.hoho.android.usbserial.driver.CdcAcmSerialDriver;
+import com.hoho.android.usbserial.driver.ProbeTable;
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
 
@@ -64,10 +66,15 @@ public class DevicesFragment extends ListFragment {
                 TextView text2 = view.findViewById(R.id.text2);
                 if(item.driver == null) {
                     text1.setText(R.string.no_driver);
-                } else if(item.driver.getPorts().size() == 1)
-                    text1.setText(item.driver.getClass().getSimpleName().replace("SerialDriver",""));
-                else
-                    text1.setText(item.driver.getClass().getSimpleName().replace("SerialDriver","")+", Port "+item.port);
+
+                } else if(item.driver.getPorts().size() == 1) {
+                    text1.setText(item.driver.getClass().getSimpleName().replace("SerialDriver", ""));
+                } else {
+                    text1.setText(item.driver.getClass().getSimpleName().replace("SerialDriver", "") + ", Port " + item.port);
+                }
+                if (item.device.getVendorId()==8263) {
+                    text1.setText("Emit eScan");
+                }
                 text2.setText(String.format(Locale.US, "Vendor %04X, Product %04X", item.device.getVendorId(), item.device.getProductId()));
                 return view;
             }
@@ -143,6 +150,13 @@ public class DevicesFragment extends ListFragment {
             if(driver == null) {
                 driver = usbCustomProber.probeDevice(device);
             }
+            if (driver == null) {
+                // Probe for our custom FTDI device
+                ProbeTable customTable = new ProbeTable();
+                customTable.addProduct(8263, 768, CdcAcmSerialDriver.class);
+                UsbSerialProber prober = new UsbSerialProber(customTable);
+                driver = prober.probeDevice(device);
+            }
             if(driver != null) {
                 for(int port = 0; port < driver.getPorts().size(); port++)
                     listItems.add(new ListItem(device, port, driver));
@@ -150,7 +164,8 @@ public class DevicesFragment extends ListFragment {
                 listItems.add(new ListItem(device, 0, null));
             }
         }
-        if (listItems.size()==1) {
+        if (listItems.size()>=1) {
+            /*
             Bundle args = new Bundle();
             ListItem item = listItems.get(0);
             args.putInt("device", item.device.getDeviceId());
@@ -159,10 +174,11 @@ public class DevicesFragment extends ListFragment {
             args.putBoolean("withIoManager", withIoManager);
             Fragment fragment = new TerminalFragment();
             fragment.setArguments(args);
-            getParentFragmentManager().beginTransaction().replace(R.id.fragment, fragment, "terminal").addToBackStack(null).commit();
-        } else {
-            listAdapter.notifyDataSetChanged();
+            getParentFragmentManager().beginTransaction().replace(R.id.fragment, fragment,
+                    "terminal").addToBackStack(null).commit();
+             */
         }
+        listAdapter.notifyDataSetChanged();
     }
 
     @Override

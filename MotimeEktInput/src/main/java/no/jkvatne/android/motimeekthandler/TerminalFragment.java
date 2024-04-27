@@ -83,6 +83,9 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
     private int month;
     private int year;
     private int eScanSno;
+    private LocalDateTime eScanLastStatusTime;
+    private boolean eScanOk = false;
+
     public static String getTagValue(String xml, String tagName){
         return xml.split("<"+tagName+">")[1].split("</"+tagName+">")[0];
     }
@@ -283,8 +286,9 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
      * Serial + UI
      */
     private void connect() {
+        eScanOk = false;
         if (noWeb) {
-            return;
+            //return;
         }
         UsbDevice device = null;
         UsbManager usbManager = (UsbManager) requireActivity().getSystemService(Context.USB_SERVICE);
@@ -302,9 +306,8 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
             driver = CustomProber.getCustomProber().probeDevice(device);
         }
         if (driver == null) {
-            // Probe for our custom FTDI device, which use VID 0x1234 and PID 0x0001 and 0x0002.
+            // Probe for our custom FTDI device
             ProbeTable customTable = new ProbeTable();
-            //OK connect but no data : customTable.addProduct(8263, 768, FtdiSerialDriver.class);
             customTable.addProduct(8263, 768, CdcAcmSerialDriver.class);
             UsbSerialProber prober = new UsbSerialProber(customTable);
             //List<UsbSerialDriver> drivers = prober.findAllDrivers(usbManager);
@@ -349,7 +352,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
             }
             status(getString(R.string.usb_connected));
             connected = true;
-            //OBS send("/ST");
+            send("/ST");
         } catch (Exception e) {
             status(getString(R.string.connection_failed) + e.getMessage());
             disconnect();
@@ -357,6 +360,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
     }
 
     private void disconnect() {
+        eScanOk = false;
         connected = false;
         if (usbIoManager != null) {
             usbIoManager.setListener(null);
@@ -434,7 +438,11 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                     ecbTime = s.substring(1);
                 }
             }
-            receiveText.append("eScan "+ecbDate+" "+ecbTime+"\n");
+            eScanLastStatusTime = LocalDateTime.now();
+            if (!eScanOk) {
+                eScanOk=true;
+                receiveText.append("eScan "+ecbDate+" "+ecbTime+"\n");
+            }
         } else {
             int tStart=0;
             int no = 0;
@@ -509,8 +517,8 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                         buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
                 ektNo = ((int) buf[20] & 0xFF) + (((int) buf[21] & 0xFF) << 8) + (((int) buf[22] & 0xFF) << 16);
                 receiveText.append(String.format("Nr %d %d:%02d\n", ektNo, totalTime / 60, totalTime % 60));
-                //OBS String url = ServerUrl + "a=" + String.valueOf(compressedData);
-                //OBS getUrlContent(url);
+                String url = ServerUrl + "a=" + String.valueOf(compressedData);
+                getUrlContent(url);
             }
         }
     }
