@@ -9,6 +9,7 @@
     <string name="unsupported_parameters">Unsupported parameters</string>
     <string name="usb_connected">USB tilkoblett</string>
     <string name="connection_failed">USB forbindelse feilet</string>
+    <string name="connection_failed2">USB forbindelse feilet eSCAN</string>
     <string name="perm_missing">Har ikke tillatelse til å koble til USB</string>
     <string name="do_download">"Vil du laste ned de siste avlesningene?</string>
     <string name="download">"Last ned dagens løp"</string>

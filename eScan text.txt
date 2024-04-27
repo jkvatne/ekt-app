@@ -1,0 +1,18 @@
+
+eScan device connected:
+device = 
+UsbDevice[mName=/dev/bus/usb/002/002,mVendorId=8263,mProductId=768,mClass=2,mSubclass=0,mProtocol=0,mManufacturerName=EMIT AS,mProductName=Emit eScan,mVersion=1.12,mSerialNumberReader=android.hardware.usb.IUsbSerialReader$Stub$Proxy@7d3d974, mHasAudioPlayback=false, mHasAudioCapture=false, mHasMidi=false, mHasVideoCapture=false, mHasVideoPlayback=false, mConfigurations=[
+UsbConfiguration[mId=1,mName=MSP430 USB,mAttributes=160,mMaxPower=50,mInterfaces=[
+UsbInterface[mId=0,mAlternateSetting=0,mName=Emit Virtual COM Port (CDC),mClass=2,mSubclass=2,mProtocol=1,mEndpoints=[
+UsbEndpoint[mAddress=130,mAttributes=3,mMaxPacketSize=64,mInterval=255]
+UsbEndpoint[mAddress=3,mAttributes=2,mMaxPacketSize=64,mInterval=255]
+UsbEndpoint[mAddress=131,mAttributes=2,mMaxPacketSize=64,mInterval=255]]]]
+
+
+IeScan-HW1-SW4-V0.16	BS	C250	X0	Y856100108	A2843-862-+0-100	M1-217	U14.05.2018	W08:37:08.063	H0001	
+IeScan-HW1-SW4-V0.16	BS	C250	X0	Y856100108	A2843-860-+0-100	M1-217	U14.05.2018	W08:37:12.052	H0001	
+IeScan-HW1-SW4-V0.16	BS	C250	X0	Y856100108	A2843-863-+0-100	M1-217	U14.05.2018	W08:37:16.042	H0001	
+IeScan-HW1-SW4-V0.16	BS	C250	X0	Y856100108	A2843-869-+0-100	M1-217	U14.05.2018	W08:37:20.032	H0001	
+N249942	Y856100108	W08:37:22.402	S249942	REmit EPT V5.00                  	X0	P0-0-00:00:00.000	P1-82-00:00:02.000	P2-99-00:00:03.000	P3-160-00:00:08.001	P4-250-01:56:40.000	
+IeScan-HW1-SW4-V0.16	BS	C250	X0	Y856100108	A2843-870-+0-100	M1-241	U14.05.2018	W08:37:24.020	H0001	
+IeScan-HW1-SW4-V0.16	BS	C250	X0	Y856100108	A2843-865-+0-100	M1-241	U14.05.2018	W08:37:28.009	H0001	

@@ -73,10 +73,9 @@ public class DevicesFragment extends ListFragment {
             }
         };
     }
-
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(View v, Bundle savedInstanceState) {
+        super.onViewCreated(v, savedInstanceState);
         setListAdapter(null);
         View header = requireActivity().getLayoutInflater().inflate(R.layout.device_list_header,
                 null,

@@ -31,13 +31,17 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
+import com.hoho.android.usbserial.driver.CdcAcmSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
+import com.hoho.android.usbserial.driver.ProbeTable;
+import com.hoho.android.usbserial.driver.FtdiSerialDriver;
 import com.hoho.android.usbserial.util.SerialInputOutputManager;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
@@ -45,6 +49,8 @@ import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
+
+import static android.text.TextUtils.substring;
 
 public class TerminalFragment extends Fragment implements SerialInputOutputManager.Listener {
     private static final char[]b64chars = {'A','B','C','D','E','F','G','H','I','J','K','L','M',
@@ -70,6 +76,13 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
     private CircularBuffer cBuf;
     private String ServerUrl  = "<loaded from apikey.properties by gradle>";
     private boolean noWeb = true;
+    private String batterySts = "";
+    private String ecbDate = "";
+    private String ecbTime = "";
+    private int day;
+    private int month;
+    private int year;
+    private int eScanSno;
     public static String getTagValue(String xml, String tagName){
         return xml.split("<"+tagName+">")[1].split("</"+tagName+">")[0];
     }
@@ -133,7 +146,12 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                 error -> receiveText.append("Error response "+error+"\n")
         );
         queue.add(stringRequest);
-}
+        // Update cached date
+        LocalDate d = LocalDate.now();
+        year = d.getYear();
+        month = d.getMonthValue();
+        day = d.getDayOfMonth();
+    }
 
     /*
      * Lifecycle
@@ -144,12 +162,11 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         setHasOptionsMenu(true);
         //setRetainInstance(true);
         assert getArguments() != null;
-        //deviceId = getArguments().getInt("device");
         portNum = getArguments().getInt("port");
-        baudRate = 9600; // getArguments().getInt("baud");
+        baudRate = 9600;
         withIoManager = getArguments().getBoolean("withIoManager");
         queue = Volley.newRequestQueue(this.requireActivity());
-        cBuf = new CircularBuffer(2048);
+        cBuf = new CircularBuffer(20480);
         byte[] buf = BuildConfig.SERVER_URL.getBytes();
         ServerUrl = new String(buf, StandardCharsets.UTF_8);
     }
@@ -285,9 +302,17 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
             driver = CustomProber.getCustomProber().probeDevice(device);
         }
         if (driver == null) {
-            //status("connection failed: no driver for device");
-            status(getString(R.string.connection_failed));
-            return;
+            // Probe for our custom FTDI device, which use VID 0x1234 and PID 0x0001 and 0x0002.
+            ProbeTable customTable = new ProbeTable();
+            //OK connect but no data : customTable.addProduct(8263, 768, FtdiSerialDriver.class);
+            customTable.addProduct(8263, 768, CdcAcmSerialDriver.class);
+            UsbSerialProber prober = new UsbSerialProber(customTable);
+            //List<UsbSerialDriver> drivers = prober.findAllDrivers(usbManager);
+            driver = prober.probeDevice(device);
+            if (driver == null) {
+                status("Try special driver failed");
+                return;
+            }
         }
         if (driver.getPorts().size() < portNum) {
             //status("connection failed: not enough ports at device");
@@ -299,7 +324,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         if (usbConnection == null && usbPermission == UsbPermission.Unknown && !usbManager.hasPermission(driver.getDevice())) {
             usbPermission = UsbPermission.Requested;
             PendingIntent usbPermissionIntent = PendingIntent.getBroadcast(getActivity(), 0,
-                    new Intent(INTENT_ACTION_GRANT_USB), PendingIntent.FLAG_MUTABLE);
+                    new Intent(INTENT_ACTION_GRANT_USB), PendingIntent.FLAG_IMMUTABLE);
             usbManager.requestPermission(driver.getDevice(), usbPermissionIntent);
             return;
         }
@@ -324,7 +349,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
             }
             status(getString(R.string.usb_connected));
             connected = true;
-            send("/ST");
+            //OBS send("/ST");
         } catch (Exception e) {
             status(getString(R.string.connection_failed) + e.getMessage());
             disconnect();
@@ -369,14 +394,145 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         }
     }
 
+    //private void decodeEcb(byte[]buf) {
+    private void receiveEcb(byte[] data) {
+        int ektNo;
+        String timeRead;
+        // Copy data into circular buffer
+        for (byte c : data) {
+            cBuf.put(c);
+        }
+        // Move to 0x02 (STX) if possible
+        while ((!cBuf.isEmpty())&&(cBuf.peek(0)!=0x02)) {
+            cBuf.get();
+        }
+        if (cBuf.isEmpty()) return;
+        // Search for end of message (ETX = 0x03)
+        boolean ok = false;
+        for (int i=0; i<cBuf.length(); i++) {
+            if (cBuf.peek(i) == 0x03) {
+                ok = true;
+                break;
+            }
+        }
+        if (!ok) return;
+        // We now have a message ready, with length i
+        byte id = cBuf.get();  // Get STX
+        id = cBuf.get();    // get first char
+        if (id=='I') {
+            // This is a status message
+            String HwName = cBuf.getString();
+            while (!cBuf.isEmpty() && cBuf.peek(0)>=0x20) {
+                byte ch = cBuf.peek(0);
+                String s = cBuf.getString();
+                if (s.isEmpty()) break;
+                if (ch=='A') {
+                    batterySts = s.substring(1);
+                } else if (ch=='U') {
+                    ecbDate = s.substring(1);
+                } else if (ch=='W') {
+                    ecbTime = s.substring(1);
+                }
+            }
+            receiveText.append("eScan "+ecbDate+" "+ecbTime+"\n");
+        } else {
+            int tStart=0;
+            int no = 0;
+            byte[] buf = new byte[256];
+            String s;
+            while (!cBuf.isEmpty() && cBuf.last() != 0x03 && cBuf.last() != 0x00) {
+                byte b = cBuf.last();
+                if ((b=='N') || (b=='S')) {
+                    cBuf.skip(1);
+                    // N or S is the ekt number
+                    ektNo = cBuf.parseInt();
+                    buf[20] = (byte)((ektNo >> 0) & 0xFF);
+                    buf[21] = (byte)((ektNo >> 8) & 0xFF);
+                    buf[22] = (byte)((ektNo >> 16) & 0xFF);
+                } else if (b=='W') {
+                    cBuf.skip(1);
+                    // Time when badge was read
+                    buf[8] = (byte)(year-2000);
+                    buf[9] = (byte)month;
+                    buf[10] =(byte)day;
+                    buf[11] = (byte)cBuf.parseInt();  // hr
+                    cBuf.found((byte)':');
+                    buf[12] = (byte)cBuf.parseInt();  // min
+                    cBuf.found((byte)':');
+                    buf[13] = (byte)cBuf.parseInt();  // sec
+                    cBuf.found((byte)'.');
+                    // Skip milliseconds
+                    cBuf.getNumeric();
+                } else if (b=='U') {
+                    cBuf.skip(1);
+                    // Date, i.e. 21.01.2021
+                    day = cBuf.parseInt();
+                    cBuf.skip(1);  // Skip "."
+                    month = cBuf.parseInt();
+                    cBuf.skip(1);  // Skip "."
+                    year = cBuf.parseInt();
+                } else if (b=='P') {
+                    // Punching data for one control
+                    cBuf.skip(1);
+                    no = cBuf.parseInt();
+                    cBuf.skip(1);  // Skip "-"
+                    int control = cBuf.parseInt();
+                    cBuf.skip(1);  // Skip "-"
+                    int hrs = cBuf.parseInt();
+                    cBuf.skip(1);  // Skip ":"
+                    int min = cBuf.parseInt();
+                    cBuf.skip(1);  // Skip ":"
+                    int sec = cBuf.parseInt();
+                    cBuf.skip(1);  // Skip "."
+                    int msec = cBuf.parseInt();
+                    // Save data to a simulated brikke-buffer
+                    buf[3 * no + 26]= (byte)control;
+                    int t = sec + min*60 + hrs * 3600;
+                    if (no==1) tStart = t;
+                    buf[3 * no + 27] = (byte)((t - tStart) & 0xFF);
+                    buf[3 * no + 28] = (byte)(((t - tStart) >> 8) & 0xFF);
+
+                } else {
+                    // Skip the text
+                    s = cBuf.getString();
+                    //receiveText.append(s+"\n");
+                }
+
+            }
+
+            char[] compressedData = new char[256];
+            int totalTime = CompressTag(buf, compressedData);
+            if ((totalTime<=0)||(no==0))  {
+                receiveText.append("unknown message recieved");
+            } else {
+                receiveText.append(String.format("%02d-%02d-%02d %02d:%02d:%02d ",
+                        buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
+                ektNo = ((int) buf[20] & 0xFF) + (((int) buf[21] & 0xFF) << 8) + (((int) buf[22] & 0xFF) << 16);
+                receiveText.append(String.format("Nr %d %d:%02d\n", ektNo, totalTime / 60, totalTime % 60));
+                //OBS String url = ServerUrl + "a=" + String.valueOf(compressedData);
+                //OBS getUrlContent(url);
+            }
+        }
+    }
+
     @SuppressLint("DefaultLocale")
     private void receive(byte[] data) throws InterruptedException {
+
+        receiveEcb(data);
+        /*
         for (byte datum : data) {
             cBuf.put(datum);
         }
+        if (cBuf.Has(2) && cBuf.Has(3)) {
+            cBuf.SkipTo(2);  // Skip to STX
+            String s1 = cBuf.getString();
+            String s2 = cBuf.getString();
+            String s3 = cBuf.getString();
+            receiveText.append(s1+" "+s2+" "+s3+"\n");
+            cBuf.clear();
 
-        // Skip to FFFF and check length
-        if (cBuf.foundMessage()) {
+            // Skip to FFFF and check length
+        } else if (cBuf.foundMessage()) {
             byte[] buf = new byte[256];
             int CurrentSize;
             CurrentSize = (int) cBuf.peek(4)&0xFF;
@@ -430,7 +586,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                         cBuf.nextGet));
                 receiveText.append("Ukjent pakke med " + CurrentSize + " bytes\n");
             }
-        }
+        }*/
     }
 
     // GetEkt will read one record from the MTR3/4.
