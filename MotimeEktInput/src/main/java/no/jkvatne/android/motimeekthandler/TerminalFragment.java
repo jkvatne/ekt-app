@@ -108,12 +108,14 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
                         }
                         receiveText.append("Navn:"+getTagValue(response, "name")+"\n");
                     } catch (Exception e) {
-                        receiveText.append("Exception "+e);
+                        receiveText.append("\nException "+e+"\n");
                     }
                     // Blank line between reports
                     receiveText.append("\n");
                 },
-                error -> receiveText.append("Errror\n")
+                error -> {
+                    receiveText.append("Error in web response\n");
+                }
         );
         queue.add(stringRequest);
     }
