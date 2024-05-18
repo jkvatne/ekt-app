@@ -153,7 +153,7 @@ public class DevicesFragment extends ListFragment {
             if (driver == null) {
                 // Probe for our custom FTDI device
                 ProbeTable customTable = new ProbeTable();
-                customTable.addProduct(8263, 768, CdcAcmSerialDriver.class);
+                customTable.addProduct(0x2047, 0x0300, CdcAcmSerialDriver.class);
                 UsbSerialProber prober = new UsbSerialProber(customTable);
                 driver = prober.probeDevice(device);
             }

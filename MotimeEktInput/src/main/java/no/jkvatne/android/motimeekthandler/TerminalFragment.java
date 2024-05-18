@@ -1,17 +1,20 @@
 package no.jkvatne.android.motimeekthandler;
-
 import android.annotation.SuppressLint;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Looper;
+import android.text.Editable;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.text.method.ScrollingMovementMethod;
@@ -51,8 +54,7 @@ import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 
 import static android.text.TextUtils.substring;
-
-public class TerminalFragment extends Fragment implements SerialInputOutputManager.Listener {
+public class TerminalFragment extends Fragment implements ServiceConnection, SerialListener {
     private static final char[]b64chars = {'A','B','C','D','E','F','G','H','I','J','K','L','M',
             'N','O','P','Q','R','S','T','U','V','W','X','Y','Z','a','b','c','d','e','f','g','h',
             'i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','0','1','2',
@@ -165,7 +167,7 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
-        //setRetainInstance(true);
+        setRetainInstance(true);
         assert getArguments() != null;
         portNum = getArguments().getInt("port");
         baudRate = 9600;
@@ -174,6 +176,57 @@ public class TerminalFragment extends Fragment implements SerialInputOutputManag
         cBuf = new CircularBuffer(20480);
         byte[] buf = BuildConfig.SERVER_URL.getBytes();
         ServerUrl = new String(buf, StandardCharsets.UTF_8);
+    }
+    /*
+     * Lifecycle
+     */
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setHasOptionsMenu(true);
+        setRetainInstance(true);
+        deviceId = getArguments().getInt("device");
+        portNum = getArguments().getInt("port");
+        baudRate = getArguments().getInt("baud");
+    }
+
+    @Override
+    public void onDestroy() {
+        if (connected != Connected.False)
+            disconnect();
+        getActivity().stopService(new Intent(getActivity(), SerialService.class));
+        super.onDestroy();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        if(service != null)
+            service.attach(this);
+        else
+            getActivity().startService(new Intent(getActivity(), SerialService.class)); // prevents service destroy on unbind from recreated activity caused by orientation change
+        ContextCompat.registerReceiver(getActivity(), broadcastReceiver, new IntentFilter(Constants.INTENT_ACTION_GRANT_USB), ContextCompat.RECEIVER_NOT_EXPORTED);
+    }
+
+    @Override
+    public void onStop() {
+        getActivity().unregisterReceiver(broadcastReceiver);
+        if(service != null && !getActivity().isChangingConfigurations())
+            service.detach();
+        super.onStop();
+    }
+
+    @SuppressWarnings("deprecation") // onAttach(context) was added with API 23. onAttach(activity) works for all API versions
+    @Override
+    public void onAttach(@NonNull Activity activity) {
+        super.onAttach(activity);
+        getActivity().bindService(new Intent(getActivity(), SerialService.class), this, Context.BIND_AUTO_CREATE);
+    }
+
+    @Override
+    public void onDetach() {
+        try { getActivity().unbindService(this); } catch(Exception ignored) {}
+        super.onDetach();
     }
 
     @Override
