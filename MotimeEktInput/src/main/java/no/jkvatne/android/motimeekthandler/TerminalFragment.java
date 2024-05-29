@@ -14,13 +14,9 @@ import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.IBinder;
-import android.os.Looper;
-import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.text.method.ScrollingMovementMethod;
-import android.text.style.ForegroundColorSpan;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -69,7 +65,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private int portNum, baudRate;
     // private boolean withIoManager;
     private final BroadcastReceiver broadcastReceiver;
-    private final Handler mainLooper;
     private TextView receiveText;
     private TextView statusText;
     private SerialInputOutputManager usbIoManager;
@@ -106,7 +101,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 }
             }
         };
-        mainLooper = new Handler(Looper.getMainLooper());
     }
 
     /*
@@ -333,7 +327,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             device = v;
         }
         if (device == null) {
-            status(getString(R.string.connection_failed));
+                status(getString(R.string.connection_failed));
             return;
         }
         UsbSerialDriver driver = UsbSerialProber.getDefaultProber().probeDevice(device);
@@ -475,7 +469,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 String s = cBuf.getString();
                 if (s.isEmpty()) break;
                 if (ch == 'A') {
-                    batterySts = s.substring(1);
+                    batterySts = s.substring(s.length()-3);
+                    if (batterySts.substring(0,1)=="-") batterySts = batterySts.substring(1);
                 } else if (ch == 'U') {
                     ecbDate = s.substring(1);
                 } else if (ch == 'W') {
@@ -484,7 +479,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             }
             eScanLastStatusTime = LocalDateTime.now();
             if (ecbTime.length()>4) {
-                statusText.setText("eScan ok, "+ecbTime.substring(0, ecbTime.length()-4));
+                //statusText.setText("eScan ok, "+ecbTime.substring(0, ecbTime.length()-4)+" ");
+                statusText.setText(getString(R.string.escan_sts,
+                        ecbTime.substring(0,ecbTime.length()-4), batterySts));
             }
         } else {
             int tStart = 0;

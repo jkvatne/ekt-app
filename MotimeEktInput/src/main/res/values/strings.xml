@@ -14,4 +14,5 @@
     <string name="do_download">"Vil du laste ned de siste avlesningene?</string>
     <string name="download">"Last ned dagens løp"</string>
     <string name="status">"Status"</string>
+    <string name="escan_sts">"eScan ok %s, %s%% battery"</string>
 </resources>
