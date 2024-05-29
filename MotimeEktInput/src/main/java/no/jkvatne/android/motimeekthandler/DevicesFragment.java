@@ -166,7 +166,7 @@ public class DevicesFragment extends ListFragment {
             }
         }
         if (listItems.size()>=1) {
-            /*
+            // Automaticaly start application when usb device is detected
             Bundle args = new Bundle();
             ListItem item = listItems.get(0);
             args.putInt("device", item.device.getDeviceId());
@@ -177,7 +177,7 @@ public class DevicesFragment extends ListFragment {
             fragment.setArguments(args);
             getParentFragmentManager().beginTransaction().replace(R.id.fragment, fragment,
                     "terminal").addToBackStack(null).commit();
-             */
+
         }
         listAdapter.notifyDataSetChanged();
     }

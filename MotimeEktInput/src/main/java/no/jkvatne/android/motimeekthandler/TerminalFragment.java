@@ -792,7 +792,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 response -> {
                     try {
                         receiveText.append(getText(R.string.server_ok));
-                        receiveText.append(" \n\n");
+                        receiveText.append(" \n");
                     } catch (Exception e) {
                         receiveText.append("Exception " + response);
                     }
@@ -812,7 +812,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
      */
     @Override
     public void onSerialConnect() {
-        status("connected");
+        status("USB connected");
         connected = Connected.True;
     }
 
