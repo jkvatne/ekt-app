@@ -44,11 +44,16 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayDeque;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
+
+import static java.util.concurrent.TimeUnit.*;
 
 public class TerminalFragment extends Fragment implements ServiceConnection, SerialListener {
     private static final char[] b64chars = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
@@ -80,14 +85,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private String ServerUrl = "<loaded from apikey.properties by gradle>";
     private boolean noWeb = true;
     private String batterySts = "";
-    private String ecbDate = "";
     private String ecbTime = "";
     private int day;
     private int month;
     private int year;
-    private int eScanSno;
     private LocalDateTime eScanLastStatusTime;
-    private boolean eScanOk = false;
+    public boolean eScanOk = false;
+    public boolean mtrOk = false;
 
     public TerminalFragment() {
         broadcastReceiver = new BroadcastReceiver() {
@@ -113,8 +117,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         setRetainInstance(true);
         assert getArguments() != null;
         portNum = getArguments().getInt("port");
+        String deviceName = getArguments().getString("name");
+        if (deviceName.equals("Emit eScan")) eScanOk = true;
         baudRate = 9600;
-        //withIoManager = getArguments().getBoolean("withIoManager");
         queue = Volley.newRequestQueue(this.requireActivity());
         cBuf = new CircularBuffer(20480);
         byte[] buf = BuildConfig.SERVER_URL.getBytes();
@@ -125,7 +130,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public void onDestroy() {
         if (connected != Connected.False)
             disconnect();
-        getActivity().stopService(new Intent(getActivity(), SerialService.class));
+        requireActivity().stopService(new Intent(getActivity(), SerialService.class));
         super.onDestroy();
     }
 
@@ -135,14 +140,14 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         if (service != null)
             service.attach(this);
         else
-            getActivity().startService(new Intent(getActivity(), SerialService.class)); // prevents service destroy on unbind from recreated activity caused by orientation change
-        ContextCompat.registerReceiver(getActivity(), broadcastReceiver, new IntentFilter(Constants.INTENT_ACTION_GRANT_USB), ContextCompat.RECEIVER_NOT_EXPORTED);
+            requireActivity().startService(new Intent(getActivity(), SerialService.class)); // prevents service destroy on unbind from recreated activity caused by orientation change
+        ContextCompat.registerReceiver(requireActivity(), broadcastReceiver, new IntentFilter(Constants.INTENT_ACTION_GRANT_USB), ContextCompat.RECEIVER_NOT_EXPORTED);
     }
 
     @Override
     public void onStop() {
-        getActivity().unregisterReceiver(broadcastReceiver);
-        if (service != null && !getActivity().isChangingConfigurations())
+        requireActivity().unregisterReceiver(broadcastReceiver);
+        if (service != null && !requireActivity().isChangingConfigurations())
             service.detach();
         super.onStop();
     }
@@ -152,12 +157,12 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onAttach(@NonNull Activity activity) {
         super.onAttach(activity);
-        getActivity().bindService(new Intent(getActivity(), SerialService.class), this, Context.BIND_AUTO_CREATE);
+        requireActivity().bindService(new Intent(getActivity(), SerialService.class), this, Context.BIND_AUTO_CREATE);
     }
 
     @Override
     public void onDetach() {
-        try {getActivity().unbindService(this);} catch (Exception ignored) {}
+        try {requireActivity().unbindService(this);} catch (Exception ignored) {}
         super.onDetach();
     }
 
@@ -166,7 +171,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         super.onResume();
         if (initialStart && service != null) {
             initialStart = false;
-            getActivity().runOnUiThread(this::connect);
+            requireActivity().runOnUiThread(this::connect);
         }
         /*
         ContextCompat.registerReceiver(requireContext(), broadcastReceiver,
@@ -190,7 +195,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         service.attach(this);
         if (initialStart && isResumed()) {
             initialStart = false;
-            getActivity().runOnUiThread(this::connect);
+            requireActivity().runOnUiThread(this::connect);
         }
     }
 
@@ -208,8 +213,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         View view = inflater.inflate(R.layout.fragment_terminal, container, false);
         receiveText = view.findViewById(R.id.receive_text);
         statusText = view.findViewById(R.id.statusTextView);
-        // TextView
-        // performance decreases with number of spans
+        // TextView performance decreases with number of spans
         // set as default color to reduce number of spans
         receiveText.setTextColor(ContextCompat.getColor(requireContext(), R.color.colorRecieveText));
         receiveText.setMovementMethod(ScrollingMovementMethod.getInstance());
@@ -233,14 +237,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     public void onPrepareOptionsMenu(@NonNull Menu menu) {
-        /*
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            menu.findItem(R.id.backgroundNotification).setChecked(service != null && service.areNotificationsEnabled());
-        } else {
-            menu.findItem(R.id.backgroundNotification).setChecked(true);
-            menu.findItem(R.id.backgroundNotification).setEnabled(false);
-        }
-         */
     }
 
     @Override
@@ -250,17 +246,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             receiveText.setText("");
             cBuf.clear();
             return true;
-            /*
-        } else if (id == R.id.backgroundNotification) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (!service.areNotificationsEnabled() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 0);
-                } else {
-                    showNotificationSettings();
-                }
-            }
-            return true;
-             */
         } else {
             return super.onOptionsItemSelected(item);
         }
@@ -272,27 +257,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         intent.putExtra("android.provider.extra.APP_PACKAGE", getActivity().getPackageName());
         startActivity(intent);
     }
-    /*
-     * Serial
-    @Override
-    public void onNewData(byte[] data) {
-        mainLooper.post(() -> {
-            try {
-                receive(data);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        });
-    }
-
-    @Override
-    public void onRunError(Exception e) {
-        mainLooper.post(() -> {
-            status(e.getMessage());
-            disconnect();
-        });
-    }
-     */
 
     /*
      * Serial + UI
@@ -376,21 +340,11 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             } catch (UnsupportedOperationException e) {
                 status(getString(R.string.unsupported_parameters));
             }
-            SerialSocket socket = new SerialSocket(getActivity().getApplicationContext(), usbConnection, usbSerialPort);
+            SerialSocket socket = new SerialSocket(requireActivity().getApplicationContext(), usbConnection, usbSerialPort);
             service.connect(socket);
             // usb connect is not asynchronous. connect-success and connect-error are returned immediately from socket.connect
             // for consistency to bluetooth/bluetooth-LE app use same SerialListener and SerialService classes
             onSerialConnect();
-
-            /*
-            if (withIoManager) {
-                usbIoManager = new SerialInputOutputManager(usbSerialPort, this);
-                usbIoManager.start();
-            }
-            status(getString(R.string.usb_connected));
-            connected = Connected.True;
-            send("/ST");
-            */
         } catch (Exception e) {
             status(getString(R.string.connection_failed) + e.getMessage());
             disconnect();
@@ -470,16 +424,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 if (s.isEmpty()) break;
                 if (ch == 'A') {
                     batterySts = s.substring(s.length()-3);
-                    if (batterySts.substring(0,1)=="-") batterySts = batterySts.substring(1);
-                } else if (ch == 'U') {
-                    ecbDate = s.substring(1);
+                    if (batterySts.charAt(0)=='-') batterySts = batterySts.substring(1);
                 } else if (ch == 'W') {
                     ecbTime = s.substring(1);
                 }
             }
             eScanLastStatusTime = LocalDateTime.now();
             if (ecbTime.length()>4) {
-                //statusText.setText("eScan ok, "+ecbTime.substring(0, ecbTime.length()-4)+" ");
                 statusText.setText(getString(R.string.escan_sts,
                         ecbTime.substring(0,ecbTime.length()-4), batterySts));
             }
@@ -493,7 +444,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     cBuf.skip(1);
                     // N or S is the ekt number
                     ektNo = cBuf.parseInt();
-                    buf[20] = (byte) ((ektNo >> 0) & 0xFF);
+                    buf[20] = (byte) (ektNo & 0xFF);
                     buf[21] = (byte) ((ektNo >> 8) & 0xFF);
                     buf[22] = (byte) ((ektNo >> 16) & 0xFF);
                 } else if (b == 'W') {
@@ -551,23 +502,18 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             if ((totalTime <= 0) || (no == 0)) {
                 receiveText.append("unknown message recieved");
             } else {
-                receiveText.append(String.format("%02d-%02d-%02d %02d:%02d:%02d ",
+                receiveText.append(String.format(Locale.ROOT, "%02d-%02d-%02d %02d:%02d:%02d ",
                         buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
                 ektNo = ((int) buf[20] & 0xFF) + (((int) buf[21] & 0xFF) << 8) + (((int) buf[22] & 0xFF) << 16);
-                receiveText.append(String.format("Nr %d %d:%02d\n", ektNo, totalTime / 60, totalTime % 60));
+                receiveText.append(String.format(Locale.ROOT, "Nr %d %d:%02d\n", ektNo,
+                        totalTime / 60, totalTime % 60));
                 String url = ServerUrl + "a=" + String.valueOf(compressedData);
                 getUrlContent(url);
             }
         }
     }
 
-    @SuppressLint("DefaultLocale")
-    private void receive(ArrayDeque<byte[]> datas) throws InterruptedException {
-        SpannableStringBuilder spn = new SpannableStringBuilder();
-        for (byte[] data : datas) {
-            receiveEcb(data);
-        }
-        /*
+    private void receiveMtr(byte[] data) {
         for (byte datum : data) {
             cBuf.put(datum);
         }
@@ -591,16 +537,16 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 char[] compressedData = new char[256];
                 int totalTime = CompressTag(buf, compressedData);
 
-                receiveText.append(String.format("%02d-%02d-%02d %02d:%02d:%02d ",
+                receiveText.append(String.format(Locale.ROOT, "%02d-%02d-%02d %02d:%02d:%02d ",
                         buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
 
                 int ektNo = ((int) buf[20] & 0xFF) + (((int) buf[21] & 0xFF) << 8) + (((int) buf[22] & 0xFF) << 16);
-                receiveText.append(String.format("Nr %d %d:%02d\n", ektNo,
+                receiveText.append(String.format(Locale.ROOT, "Nr %d %d:%02d\n", ektNo,
                         totalTime / 60, totalTime % 60));
                 String url =  ServerUrl + "a=" + String.valueOf(compressedData);
                 getUrlContent(url);
             } else if (CurrentSize == 55) {
-                receiveText.append(String.format("Status 20%02d-%02d-%02d %02d:%02d:%02d\n",
+                receiveText.append(String.format(Locale.ROOT, "Status 20%02d-%02d-%02d %02d:%02d:%02d\n",
                         buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
                 int recNo = ((int) buf[17] & 0xFF) + (((int) buf[18] & 0xFF) << 8)
                             + (((int) buf[19] & 0xFF) << 16)+(((int) buf[20] & 0xFF) << 24);
@@ -608,7 +554,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 //        + (((int) buf[23] & 0xFF) << 16)+(((int) buf[24] & 0xFF) << 24);
                 prevNo = ((int) buf[25] & 0xFF) + (((int) buf[26] & 0xFF) << 8)
                         + (((int) buf[27] & 0xFF) << 16)+(((int) buf[28] & 0xFF) << 24);
-                receiveText.append(String.format("Siste løp har %d brikker\n", recNo-prevNo+1));
+                receiveText.append(String.format(Locale.ROOT, "Siste løp har %d brikker\n", recNo-prevNo+1));
 
                 // Get current time and compare
                 LocalDateTime t = LocalDateTime.now();
@@ -625,16 +571,35 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 if (y!=buf[8] || mo!=buf[9] || d!=buf[10] || h!=buf[11] || mi!=buf[12] || diff>2) {
                     receiveText.append("Oppdaterer MTR klokke\n");
                     send("/SC"+(char)y+(char)mo+(char)d+(char)h+(char)mi+(char)s);
-                    TimeUnit.MILLISECONDS.sleep(100);
+                    try { MILLISECONDS.sleep(100);} catch (Exception ignored) {}
                 } else {
                     receiveText.append("MTR klokke OK\n\n");
                 }
             } else if (CurrentSize > 0) {
-                receiveText.append(String.format("nextPut=%d  nextGet=%d\n", cBuf.nextPut,
+                receiveText.append(String.format(Locale.ROOT, "nextPut=%d  nextGet=%d\n", cBuf.nextPut,
                         cBuf.nextGet));
                 receiveText.append("Ukjent pakke med " + CurrentSize + " bytes\n");
             }
-        }*/
+        }
+    }
+
+    private void receive(ArrayDeque<byte[]> datas) throws InterruptedException {
+        for (byte[] data : datas) {
+            if (eScanOk) {
+                receiveEcb(data);
+            } else if (mtrOk) {
+                receiveMtr(data);
+            } else if ((data.length>2)&&(data[0]==0xFF) && (data[1]==0xFF)) {
+                mtrOk = true;
+                eScanOk = false;
+            } else if ((data.length>3)&&(data[2]=='e')&&(data[3]=='S')) {
+                eScanOk = true;
+                mtrOk = false;
+            } else if ((data.length>3)&&(data[0]=='e')&&(data[1]=='S')&&(data[2]=='c')) {
+                eScanOk = true;
+                mtrOk = false;
+            }
+        }
     }
 
     // GetEkt will read one record from the MTR3/4.

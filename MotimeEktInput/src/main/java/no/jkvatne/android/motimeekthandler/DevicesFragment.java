@@ -139,8 +139,7 @@ public class DevicesFragment extends ListFragment {
     }
 
     void refresh() {
-        //View view = requireActivity().getLayoutInflater().inflate(
-        //        R.layout.activity_main,null,false);
+        String name;
         UsbManager usbManager =
                 (UsbManager) requireActivity().getSystemService(Context.USB_SERVICE);
         UsbSerialProber usbDefaultProber = UsbSerialProber.getDefaultProber();
@@ -165,13 +164,15 @@ public class DevicesFragment extends ListFragment {
                 listItems.add(new ListItem(device, 0, null));
             }
         }
-        if (listItems.size()>=1) {
+        if (!listItems.isEmpty()) {
             // Automaticaly start application when usb device is detected
             Bundle args = new Bundle();
             ListItem item = listItems.get(0);
             args.putInt("device", item.device.getDeviceId());
             args.putInt("port", item.port);
             args.putInt("baud", baudRate);
+            name = item.device.getProductName();
+            args.putString("name", name);
             args.putBoolean("withIoManager", withIoManager);
             Fragment fragment = new TerminalFragment();
             fragment.setArguments(args);
