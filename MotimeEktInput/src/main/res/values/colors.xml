@@ -6,5 +6,5 @@
 
     <color name="colorRecieveText">#00FF00</color>
     <color name="colorSendText">#82CAFF</color>
-    <color name="colorStatusText">#FFDB58</color>
+    <color name="colorStatusText">#FFFFFF</color>
 </resources>

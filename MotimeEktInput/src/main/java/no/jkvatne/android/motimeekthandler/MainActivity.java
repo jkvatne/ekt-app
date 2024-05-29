@@ -2,6 +2,7 @@ package no.jkvatne.android.motimeekthandler;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.WindowManager;
 
 import java.util.Objects;
 
@@ -21,6 +22,7 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
             getSupportFragmentManager().beginTransaction().add(R.id.fragment, new DevicesFragment(), "devices").commit();
         else
             onBackStackChanged();
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 
     @Override

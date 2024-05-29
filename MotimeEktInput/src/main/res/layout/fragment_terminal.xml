@@ -27,6 +27,13 @@
         android:textAppearance="@style/TextAppearance.AppCompat.Medium"
         android:typeface="monospace" />
 
+    <TextView
+        android:id="@+id/statusTextView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Status"
+        android:textSize="10pt" />
+
     <View
         android:layout_width="match_parent"
         android:background="?android:attr/listDivider"

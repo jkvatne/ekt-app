@@ -80,6 +80,7 @@ public class DevicesFragment extends ListFragment {
             }
         };
     }
+
     @Override
     public void onViewCreated(View v, Bundle savedInstanceState) {
         super.onViewCreated(v, savedInstanceState);
