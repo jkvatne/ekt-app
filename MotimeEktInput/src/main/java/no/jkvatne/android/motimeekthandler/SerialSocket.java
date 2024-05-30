@@ -19,7 +19,7 @@ import java.security.InvalidParameterException;
 
 public class SerialSocket implements SerialInputOutputManager.Listener {
 
-    private static final int WRITE_WAIT_MILLIS = 2000; // 0 blocked infinitely on unprogrammed arduino
+    private static final int WRITE_WAIT_MILLIS = 2000;
     private final static String TAG = SerialSocket.class.getSimpleName();
 
     private final BroadcastReceiver disconnectBroadcastReceiver;
@@ -50,7 +50,8 @@ public class SerialSocket implements SerialInputOutputManager.Listener {
 
     void connect(SerialListener listener) throws IOException {
         this.listener = listener;
-        ContextCompat.registerReceiver(context, disconnectBroadcastReceiver, new IntentFilter(Constants.INTENT_ACTION_DISCONNECT), ContextCompat.RECEIVER_NOT_EXPORTED);
+        ContextCompat.registerReceiver(context, disconnectBroadcastReceiver,
+                new IntentFilter(Constants.INTENT_ACTION_DISCONNECT), ContextCompat.RECEIVER_NOT_EXPORTED);
 	try {
 	    serialPort.setDTR(true); // for arduino, ...
 	    serialPort.setRTS(true);

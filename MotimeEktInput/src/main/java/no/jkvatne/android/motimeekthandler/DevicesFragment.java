@@ -139,7 +139,7 @@ public class DevicesFragment extends ListFragment {
     }
 
     void refresh() {
-        String name;
+
         UsbManager usbManager =
                 (UsbManager) requireActivity().getSystemService(Context.USB_SERVICE);
         UsbSerialProber usbDefaultProber = UsbSerialProber.getDefaultProber();
@@ -166,21 +166,26 @@ public class DevicesFragment extends ListFragment {
         }
         if (!listItems.isEmpty()) {
             // Automaticaly start application when usb device is detected
-            Bundle args = new Bundle();
-            ListItem item = listItems.get(0);
-            args.putInt("device", item.device.getDeviceId());
-            args.putInt("port", item.port);
-            args.putInt("baud", baudRate);
-            name = item.device.getProductName();
-            args.putString("name", name);
-            args.putBoolean("withIoManager", withIoManager);
-            Fragment fragment = new TerminalFragment();
-            fragment.setArguments(args);
-            getParentFragmentManager().beginTransaction().replace(R.id.fragment, fragment,
-                    "terminal").addToBackStack(null).commit();
+            startup();
 
         }
         listAdapter.notifyDataSetChanged();
+    }
+
+    private void startup() {
+        String name;
+        Bundle args = new Bundle();
+        ListItem item = listItems.get(0);
+        args.putInt("device", item.device.getDeviceId());
+        args.putInt("port", item.port);
+        args.putInt("baud", baudRate);
+        name = item.device.getProductName();
+        args.putString("name", name);
+        args.putBoolean("withIoManager", withIoManager);
+        Fragment fragment = new TerminalFragment();
+        fragment.setArguments(args);
+        getParentFragmentManager().beginTransaction().replace(R.id.fragment, fragment,
+                "terminal").addToBackStack(null).commit();
     }
 
     @Override
@@ -189,14 +194,7 @@ public class DevicesFragment extends ListFragment {
         if(item.driver == null) {
             Toast.makeText(getActivity(), "no driver", Toast.LENGTH_SHORT).show();
         } else {
-            Bundle args = new Bundle();
-            args.putInt("device", item.device.getDeviceId());
-            args.putInt("port", item.port);
-            args.putInt("baud", baudRate);
-            args.putBoolean("withIoManager", withIoManager);
-            Fragment fragment = new TerminalFragment();
-            fragment.setArguments(args);
-            getParentFragmentManager().beginTransaction().replace(R.id.fragment, fragment, "terminal").addToBackStack(null).commit();
+            startup();
         }
     }
 

@@ -68,7 +68,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private static final String INTENT_ACTION_GRANT_USB = BuildConfig.APPLICATION_ID + ".GRANT_USB";
     private static final int WRITE_WAIT_MILLIS = 2000;
     private int portNum, baudRate;
-    // private boolean withIoManager;
     private final BroadcastReceiver broadcastReceiver;
     private TextView receiveText;
     private TextView statusText;
@@ -298,6 +297,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         if (driver == null) {
             driver = CustomProber.getCustomProber().probeDevice(device);
         }
+        /*
         if (driver == null) {
             // Probe for our custom FTDI device
             ProbeTable customTable = new ProbeTable();
@@ -309,7 +309,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 status("Try special driver failed");
                 return;
             }
-        }
+        }*/
         if (driver.getPorts().size() < portNum) {
             //status("connection failed: not enough ports at device");
             status(getString(R.string.connection_failed));
@@ -345,6 +345,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             // usb connect is not asynchronous. connect-success and connect-error are returned immediately from socket.connect
             // for consistency to bluetooth/bluetooth-LE app use same SerialListener and SerialService classes
             onSerialConnect();
+            send("/ST");
         } catch (Exception e) {
             status(getString(R.string.connection_failed) + e.getMessage());
             disconnect();
@@ -378,13 +379,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void send(String str) {
+        str = str + "\r\n";
         if (connected != Connected.True) {
             Toast.makeText(getActivity(), "not connected", Toast.LENGTH_SHORT).show();
             return;
         }
         try {
             byte[] data = (str).getBytes();
-            //usbSerialPort.write(data, WRITE_WAIT_MILLIS);
             service.write(data);
         } catch (Exception e) {
             status(e.getMessage());
@@ -393,7 +394,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
 
     private void receiveEcb(byte[] data) {
-        int ektNo;
+        int ektNo; int messLen;
         // Copy data into circular buffer
         for (byte c : data) {
             cBuf.put(c);
@@ -405,14 +406,14 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         if (cBuf.isEmpty()) return;
         // Search for end of message (ETX = 0x03)
         boolean ok = false;
-        for (int i = 0; i < cBuf.length(); i++) {
-            if (cBuf.peek(i) == 0x03) {
+        for (messLen = 0; messLen < cBuf.length(); messLen++) {
+            if (cBuf.peek(messLen) == 0x03) {
                 ok = true;
                 break;
             }
         }
         if (!ok) return;
-        // We now have a message ready, with length i
+        // We now have a message ready, with length messLen
         byte id = cBuf.get();  // Get STX
         id = cBuf.get();    // get first char
         if (id == 'I') {
@@ -500,7 +501,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             char[] compressedData = new char[256];
             int totalTime = CompressTag(buf, compressedData);
             if ((totalTime <= 0) || (no == 0)) {
-                receiveText.append("unknown message recieved");
+                receiveText.append("Unknown message from ekt reader\n");
             } else {
                 receiveText.append(String.format(Locale.ROOT, "%02d-%02d-%02d %02d:%02d:%02d ",
                         buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
@@ -517,7 +518,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         for (byte datum : data) {
             cBuf.put(datum);
         }
-        if (cBuf.Has(2) && cBuf.Has(3)) {
+        /*if (cBuf.Has(2) && cBuf.Has(3)) {
             cBuf.SkipTo(2);  // Skip to STX
             String s1 = cBuf.getString();
             String s2 = cBuf.getString();
@@ -526,7 +527,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             cBuf.clear();
 
             // Skip to FFFF and check length
-        } else if (cBuf.foundMessage()) {
+        } else */
+        if (cBuf.foundMessage()) {
             byte[] buf = new byte[256];
             int CurrentSize;
             CurrentSize = (int) cBuf.peek(4)&0xFF;
@@ -546,6 +548,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 String url =  ServerUrl + "a=" + String.valueOf(compressedData);
                 getUrlContent(url);
             } else if (CurrentSize == 55) {
+                status("MTR ok");
                 receiveText.append(String.format(Locale.ROOT, "Status 20%02d-%02d-%02d %02d:%02d:%02d\n",
                         buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
                 int recNo = ((int) buf[17] & 0xFF) + (((int) buf[18] & 0xFF) << 8)
@@ -589,13 +592,12 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 receiveEcb(data);
             } else if (mtrOk) {
                 receiveMtr(data);
-            } else if ((data.length>2)&&(data[0]==0xFF) && (data[1]==0xFF)) {
+            } else if ((data.length>2)&&(data[0]==-1) && (data[1]==-1)) {
                 mtrOk = true;
                 eScanOk = false;
-            } else if ((data.length>3)&&(data[2]=='e')&&(data[3]=='S')) {
-                eScanOk = true;
-                mtrOk = false;
-            } else if ((data.length>3)&&(data[0]=='e')&&(data[1]=='S')&&(data[2]=='c')) {
+                receiveMtr(data);
+            } else if ((data.length>3)&&(data[2]=='e')&&(data[3]=='S')
+                    ||(data.length>3)&&(data[0]=='e')&&(data[1]=='S')&&(data[2]=='c')) {
                 eScanOk = true;
                 mtrOk = false;
             }
@@ -776,6 +778,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public void onSerialConnect() {
         status("USB connected");
         connected = Connected.True;
+        getStatus();
     }
 
     @Override
