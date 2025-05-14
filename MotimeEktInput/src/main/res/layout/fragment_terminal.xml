@@ -6,10 +6,10 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"/>
+    <View
+        android:layout_width="match_parent"
+        android:background="?android:attr/listDivider"
+        android:layout_height="2dp" />
 
     <TextView
         android:id="@+id/receive_text"
@@ -32,7 +32,7 @@
         android:id="@+id/statusTextView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Status"
+        android:text="@status"
         android:textSize="9pt" />
 
     <View
@@ -42,17 +42,17 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="55dp"
         android:orientation="horizontal">
 
         <ImageButton
             android:id="@+id/spool_btn"
             android:layout_width="83dp"
-            android:layout_height="45dp"
+            android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@color/colorPrimary"
             android:contentDescription="@string/download"
-            android:tooltipText="Send all data in memory"
+            android:tooltipText="Overfør alle data i avleseren"
             app:srcCompat="@drawable/baseline_download_24" />
 
         <ImageButton
@@ -75,12 +75,6 @@
             android:tooltipText="Clear all saved data"
             app:srcCompat="@drawable/ic_clear_white_24dp" />
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/statusTextView3"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textSize="8sp" />
 
 </LinearLayout>
 
