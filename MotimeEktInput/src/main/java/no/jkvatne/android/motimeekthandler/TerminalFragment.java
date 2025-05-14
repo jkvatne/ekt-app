@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.Locale;
 import java.util.Objects;
@@ -85,6 +86,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private boolean noWeb = true;
     private String batterySts = "";
     private String ecbTime = "";
+    private String messNo = "";
     private int day;
     private int month;
     private int year;
@@ -168,7 +170,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onResume() {
         super.onResume();
-        if (initialStart && service != null) {
+        // Did have if (initialStart &&...
+        if (service != null) {
             initialStart = false;
             requireActivity().runOnUiThread(this::connect);
         }
@@ -192,7 +195,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public void onServiceConnected(ComponentName name, IBinder binder) {
         service = ((SerialService.SerialBinder) binder).getService();
         service.attach(this);
-        if (initialStart && isResumed()) {
+        // Did have if (initialStart &&...
+        if (isResumed()) {
             initialStart = false;
             requireActivity().runOnUiThread(this::connect);
         }
@@ -227,6 +231,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         spoolBtn.setOnClickListener(v -> onSpool());
         View stsBtn = view.findViewById(R.id.status_btn);
         stsBtn.setOnClickListener(v -> getStatus());
+        View clearBtn = view.findViewById(R.id.clear_btn);
+        clearBtn.setOnClickListener(v -> onClear());
+
         return view;
     }
 
@@ -260,6 +267,19 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     /*
      * Serial + UI
      */
+
+    public void onClear() {
+        AlertDialog.Builder adb = new AlertDialog.Builder(requireActivity());
+        adb.setTitle(getString(R.string.do_clear));
+        adb.setIcon(android.R.drawable.ic_dialog_alert);
+        adb.setPositiveButton(android.R.string.ok, (dialog, which) -> {
+            ClearAll();
+        });
+        adb.setNegativeButton(android.R.string.cancel, (dialog, which) -> {
+            // Do nothing
+        });
+        adb.show();
+    }
 
     public void onSpool() {
         if (noWeb) {
@@ -346,6 +366,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             // for consistency to bluetooth/bluetooth-LE app use same SerialListener and SerialService classes
             onSerialConnect();
             send("/ST");
+            status("Connected ok");
+            receiveText.append("USB connection ok\n");
         } catch (Exception e) {
             status(getString(R.string.connection_failed) + e.getMessage());
             disconnect();
@@ -381,7 +403,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private void send(String str) {
         str = str + "\r\n";
         if (connected != Connected.True) {
-            Toast.makeText(getActivity(), "not connected", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getActivity(), "Ikke kontakt med avleser. Ta ut og plugg inn på nytt", Toast.LENGTH_LONG).show();
             return;
         }
         try {
@@ -428,12 +450,14 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     if (batterySts.charAt(0)=='-') batterySts = batterySts.substring(1);
                 } else if (ch == 'W') {
                     ecbTime = s.substring(1);
+                } else if (ch == 'M') {
+                    messNo = s.substring(1);
                 }
             }
             eScanLastStatusTime = LocalDateTime.now();
             if (ecbTime.length()>4) {
                 statusText.setText(getString(R.string.escan_sts,
-                        ecbTime.substring(0,ecbTime.length()-4), batterySts));
+                        ecbTime.substring(0,ecbTime.length()-4), batterySts, messNo));
             }
         } else {
             int tStart = 0;
@@ -484,10 +508,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     int sec = cBuf.parseInt();
                     cBuf.skip(1);  // Skip "."
                     int msec = cBuf.parseInt();
-                    // Save data to a simulated brikke-buffer
+                    // Save data to buffer
                     buf[3 * no + 26] = (byte) control;
                     int t = sec + min * 60 + hrs * 3600;
-                    if (no == 1) tStart = t;
+                    if (no == 0) tStart = t;
                     buf[3 * no + 27] = (byte) ((t - tStart) & 0xFF);
                     buf[3 * no + 28] = (byte) (((t - tStart) >> 8) & 0xFF);
 
@@ -612,11 +636,37 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         sendbytes(data);
     }
 
-    // SpoolEkt will read all recoerds starting at given number from the MTR3/4.
+    // SpoolEkt will read all records starting at given number from the MTR3/4.
     void SpoolPackage(int no) {
-        receiveText.append("Henter pakker fra nr. " + no + "\n");
-        byte[] data = {0x2F, 0x53, 0x42, (byte) (no & 0xFF), (byte) ((no >> 8) & 0xFF),
-                (byte) ((no >> 16) & 0xFF), (byte) ((no >> 24) & 0xFF)};
+        if (mtrOk) {
+            receiveText.append("Henter pakker fra nr. " + no + "\n");
+            // Send /SBnnnn
+            byte[] data = {0x2F, 0x53, 0x42, (byte) (no & 0xFF), (byte) ((no >> 8) & 0xFF),
+                    (byte) ((no >> 16) & 0xFF), (byte) ((no >> 24) & 0xFF)};
+            sendbytes(data);
+        } else if (eScanOk) {
+            receiveText.append("Henter alle avlesninger\n");
+            //  Send /QD<cr><lf>
+            byte[] data = {0x2F, 0x51, 0x4D, 0x0D, 0x0A};
+            sendbytes(data);
+        }
+
+    }
+
+    void ClearAll() {
+        // Set clock  /SCHH:MM:SS
+        LocalDateTime ldt = LocalDateTime.now();
+        String str = ldt.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+        byte[] b = str.getBytes();
+        byte[] data2 = {0x2F, 0x53, 0x43, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], 0x0D, 0x0A };
+        sendbytes(data2);
+        String td = new String(data2);
+        receiveText.append("Klokken er nå oppdatert\n");
+        try { MILLISECONDS.sleep(100);} catch (Exception ignored) {}
+
+        // Send /CL
+        byte[] data = {0x2F, 0x43, 0x4C, 0x0D, 0x0A};
+        receiveText.append("Alle data er slettet\n");
         sendbytes(data);
     }
 
@@ -808,7 +858,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onSerialIoError(Exception e) {
-        status("connection lost: " + e.getMessage());
+        status("USB connection lost, please reconnect");
         ((Activity) getContext()).getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         disconnect();
     }

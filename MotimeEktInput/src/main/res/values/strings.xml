@@ -12,7 +12,8 @@
     <string name="connection_failed2">USB forbindelse feilet eSCAN</string>
     <string name="perm_missing">Har ikke tillatelse til å koble til USB</string>
     <string name="do_download">"Vil du laste ned de siste avlesningene?</string>
+    <string name="do_clear">"Vil du slette alle avlesninger i eScan?</string>
     <string name="download">"Last ned dagens løp"</string>
     <string name="status">"Status"</string>
-    <string name="escan_sts">"eScan ok %s, %s%% battery"</string>
+    <string name="escan_sts">"eScan ok %s, %s%% bat, %s"</string>
 </resources>

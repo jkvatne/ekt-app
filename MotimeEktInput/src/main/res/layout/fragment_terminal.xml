@@ -11,11 +11,6 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"/>
 
-    <View
-        android:layout_width="match_parent"
-        android:background="?android:attr/listDivider"
-        android:layout_height="2dp" />
-
     <TextView
         android:id="@+id/receive_text"
         android:layout_width="match_parent"
@@ -38,7 +33,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Status"
-        android:textSize="10pt" />
+        android:textSize="9pt" />
 
     <View
         android:layout_width="match_parent"
@@ -53,10 +48,11 @@
         <ImageButton
             android:id="@+id/spool_btn"
             android:layout_width="83dp"
-            android:layout_height="match_parent"
+            android:layout_height="45dp"
             android:layout_weight="1"
             android:background="@color/colorPrimary"
             android:contentDescription="@string/download"
+            android:tooltipText="Send all data in memory"
             app:srcCompat="@drawable/baseline_download_24" />
 
         <ImageButton
@@ -66,8 +62,25 @@
             android:layout_weight="1"
             android:background="@color/colorSendText"
             android:contentDescription="@text/status"
+            android:tooltipText="Query status"
             app:srcCompat="@drawable/baseline_check_24" />
+
+        <ImageButton
+            android:id="@+id/clear_btn"
+            android:layout_width="85dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@color/colorPrimaryDark"
+            android:contentDescription="@text/status"
+            android:tooltipText="Clear all saved data"
+            app:srcCompat="@drawable/ic_clear_white_24dp" />
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/statusTextView3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="8sp" />
 
 </LinearLayout>
 
