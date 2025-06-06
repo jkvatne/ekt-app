@@ -17,6 +17,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.text.SpannableStringBuilder;
 import android.text.method.ScrollingMovementMethod;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -382,9 +383,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             usbIoManager.stop();
         }
         usbIoManager = null;
-        try {
-            usbSerialPort.close();
-        } catch (IOException ignored) {}
+        if (usbSerialPort!=null) {
+            try {
+                usbSerialPort.close();
+            } catch (IOException e) {
+                usbSerialPort = null;
+            }
+        }
         usbSerialPort = null;
     }
 
@@ -533,6 +538,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 receiveText.append(String.format(Locale.ROOT, "Nr %d %d:%02d\n", ektNo,
                         totalTime / 60, totalTime % 60));
                 String url = ServerUrl + "a=" + String.valueOf(compressedData);
+                Log.e("ECB","Url="+url+"\n");
                 getUrlContent(url);
             }
         }
@@ -647,7 +653,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         } else if (eScanOk) {
             receiveText.append("Henter alle avlesninger\n");
             //  Send /QD<cr><lf>
-            byte[] data = {0x2F, 0x51, 0x4D, 0x0D, 0x0A};
+            byte[] data = {0x2F, 0x51, 0x44, 0x0D, 0x0A};
             sendbytes(data);
         }
 
@@ -775,6 +781,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 url,
                 response -> {
                     try {
+                        Log.e("ECB","response="+response);
                         receiveText.append("Klasse:" + getTagValue(response, "class") + " ");
                         int failed = Integer.parseInt(getTagValue(response, "failed"));
                         if (failed == 0) {

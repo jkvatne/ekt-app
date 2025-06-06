@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
@@ -241,30 +242,34 @@ public class SerialService extends Service implements SerialListener {
     public void onSerialRead(byte[] data) {
         if(connected) {
             synchronized (this) {
-                if (listener != null) {
-                    boolean first;
-                    synchronized (lastRead) {
-                        first = lastRead.datas.isEmpty(); // (1)
-                        lastRead.add(data); // (3)
+                try {
+                    if (listener != null) {
+                        boolean first;
+                        synchronized (lastRead) {
+                            first = lastRead.datas.isEmpty(); // (1)
+                            lastRead.add(data); // (3)
+                        }
+                        if (first) {
+                            mainLooper.post(() -> {
+                                ArrayDeque<byte[]> datas;
+                                synchronized (lastRead) {
+                                    datas = lastRead.datas;
+                                    lastRead.init(); // (2)
+                                }
+                                if (listener != null) {
+                                    listener.onSerialRead(datas);
+                                } else {
+                                    queue1.add(new QueueItem(QueueType.Read, datas));
+                                }
+                            });
+                        }
+                    } else {
+                        if (queue2.isEmpty() || queue2.getLast().type != QueueType.Read)
+                            queue2.add(new QueueItem(QueueType.Read));
+                        queue2.getLast().add(data);
                     }
-                    if(first) {
-                        mainLooper.post(() -> {
-                            ArrayDeque<byte[]> datas;
-                            synchronized (lastRead) {
-                                datas = lastRead.datas;
-                                lastRead.init(); // (2)
-                            }
-                            if (listener != null) {
-                                listener.onSerialRead(datas);
-                            } else {
-                                queue1.add(new QueueItem(QueueType.Read, datas));
-                            }
-                        });
-                    }
-                } else {
-                    if(queue2.isEmpty() || queue2.getLast().type != QueueType.Read)
-                        queue2.add(new QueueItem(QueueType.Read));
-                    queue2.getLast().add(data);
+                } catch (Exception e) {
+                    Log.e(SerialSocket.class.getSimpleName(), getString(R.string.connection_failed) + e.getMessage());
                 }
             }
         }
