@@ -16,4 +16,5 @@
     <string name="download">"Last ned dagens løp"</string>
     <string name="status">"Status"</string>
     <string name="escan_sts">"eScan ok %s, %s%% bat, %s"</string>
+    <string name="no_contact">"Ikke kontakt med avleser. Ta ut og plugg inn på nytt"</string>
 </resources>

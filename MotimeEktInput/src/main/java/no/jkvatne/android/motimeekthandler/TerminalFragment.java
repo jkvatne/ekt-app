@@ -36,13 +36,13 @@ import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
 import com.hoho.android.usbserial.util.SerialInputOutputManager;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.Locale;
+import java.util.Objects;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
@@ -107,13 +107,11 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // setHasOptionsMenu(true);
-        // setRetainInstance(true);
         assert getArguments() != null;
         portNum = getArguments().getInt("port");
         String deviceName = getArguments().getString("name");
         //if (deviceName.equals("Emit eScan")) eScanOk = true;
-        if (deviceName.equals("FT232R USB UART")) {
+        if ((deviceName!=null) && deviceName.equals("FT232R USB UART")) {
             baudRate = 115200;
         } else {
             baudRate = 9600;
@@ -172,15 +170,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         if (service != null) {
             requireActivity().runOnUiThread(this::connect);
         }
-        /*
-        ContextCompat.registerReceiver(requireContext(), broadcastReceiver,
-                new IntentFilter(INTENT_ACTION_GRANT_USB), ContextCompat.RECEIVER_EXPORTED);
-        //status("resume");
-        if (connected!=Connected.True) {
-            if (usbPermission == UsbPermission.Unknown || usbPermission == UsbPermission.Granted)
-                mainLooper.post(this::connect);
-        }
-        */
     }
 
     @Override
@@ -253,13 +242,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
     }
 
-    private void showNotificationSettings() {
-        Intent intent = new Intent();
-        intent.setAction("android.settings.APP_NOTIFICATION_SETTINGS");
-        intent.putExtra("android.provider.extra.APP_PACKAGE", getActivity().getPackageName());
-        startActivity(intent);
-    }
-
     /*
      * Serial + UI
      */
@@ -268,9 +250,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         AlertDialog.Builder adb = new AlertDialog.Builder(requireActivity());
         adb.setTitle(getString(R.string.do_clear));
         adb.setIcon(android.R.drawable.ic_dialog_alert);
-        adb.setPositiveButton(android.R.string.ok, (dialog, which) -> {
-            ClearAll();
-        });
+        adb.setPositiveButton(android.R.string.ok, (dialog, which) -> ClearAll());
         adb.setNegativeButton(android.R.string.cancel, (dialog, which) -> {
             // Do nothing
         });
@@ -313,19 +293,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         if (driver == null) {
             driver = CustomProber.getCustomProber().probeDevice(device);
         }
-        /*
-        if (driver == null) {
-            // Probe for our custom FTDI device
-            ProbeTable customTable = new ProbeTable();
-            customTable.addProduct(8263, 768, CdcAcmSerialDriver.class);
-            UsbSerialProber prober = new UsbSerialProber(customTable);
-            //List<UsbSerialDriver> drivers = prober.findAllDrivers(usbManager);
-            driver = prober.probeDevice(device);
-            if (driver == null) {
-                status("Try special driver failed");
-                return;
-            }
-        }*/
         if (driver.getPorts().size() < portNum) {
             //status("connection failed: not enough ports at device");
             status(getString(R.string.connection_failed));
@@ -381,8 +348,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         if (usbSerialPort!=null) {
             try {
                 usbSerialPort.close();
-            } catch (IOException e) {
-                usbSerialPort = null;
+            } catch (Exception ignored){
             }
         }
         usbSerialPort = null;
@@ -436,11 +402,12 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
         if (!ok) return;
         // We now have a message ready, with length messLen
-        byte id = cBuf.get();  // Get STX
+        byte id;
+        cBuf.skip(1);    // Get STX and ignore it
         id = cBuf.get();    // get first char
         if (id == 'I') {
             // This is a status message
-            String HwName = cBuf.getString();
+            //String HwName = cBuf.getString();
             while (!cBuf.isEmpty() && cBuf.peek(0) >= 0x20) {
                 byte ch = cBuf.peek(0);
                 String s = cBuf.getString();
@@ -509,7 +476,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     cBuf.skip(1);  // Skip ":"
                     int sec = cBuf.parseInt();
                     cBuf.skip(1);  // Skip "."
-                    int msec = cBuf.parseInt();
+                    //int msec = cBuf.parseInt();
                     // Save data to buffer
                     buf[3 * no + 26] = (byte) control;
                     int t = sec + min * 60 + hrs * 3600;
@@ -580,8 +547,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                         buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
                 int recNo = ((int) buf[17] & 0xFF) + (((int) buf[18] & 0xFF) << 8)
                             + (((int) buf[19] & 0xFF) << 16)+(((int) buf[20] & 0xFF) << 24);
-                //int oldestNo = ((int) buf[21] & 0xFF) + (((int) buf[22] & 0xFF) << 8)
-                //        + (((int) buf[23] & 0xFF) << 16)+(((int) buf[24] & 0xFF) << 24);
                 prevNo = ((int) buf[25] & 0xFF) + (((int) buf[26] & 0xFF) << 8)
                         + (((int) buf[27] & 0xFF) << 16)+(((int) buf[28] & 0xFF) << 24);
                 receiveText.append(String.format(Locale.ROOT, "Siste løp har %d brikker\n", recNo-prevNo+1));
@@ -613,7 +578,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
     }
 
-    private void receive(ArrayDeque<byte[]> datas) throws InterruptedException {
+    private void receive(ArrayDeque<byte[]> datas) {
         for (byte[] data : datas) {
             if (eScanOk) {
                 receiveEcb(data);
@@ -621,11 +586,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 receiveMtr(data);
             } else if ((data.length>2)&&(data[0]==-1) && (data[1]==-1)) {
                 mtrOk = true;
-                eScanOk = false;
                 receiveMtr(data);
             } else if ((data.length>3)&&(data[0]==2)&&(data[1]=='I')) {
                 eScanOk = true;
-                mtrOk = false;
             }
         }
     }
@@ -649,7 +612,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         } else if (eScanOk) {
             receiveText.append("Henter alle avlesninger\n");
             //  Send /QD<cr><lf>
-            byte[] data = {0x2F, 0x51, 0x44, 0x0D, 0x0A};
+            //byte[] data = {0x2F, 0x51, 0x44, 0x0D, 0x0A};
+            //  Send /QM<cr><lf>
+            byte[] data = {0x2F, 0x51, 0x4D, 0x0D, 0x0A};
             sendbytes(data);
         }
 
@@ -662,7 +627,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         byte[] b = str.getBytes();
         byte[] data2 = {0x2F, 0x53, 0x43, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], 0x0D, 0x0A };
         sendbytes(data2);
-        String td = new String(data2);
         receiveText.append("Klokken er nå oppdatert\n");
         try { MILLISECONDS.sleep(100);} catch (Exception ignored) {}
 
@@ -673,10 +637,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     void status(String str) {
-        // SpannableStringBuilder spn = new SpannableStringBuilder(str + '\n');
-        // spn.setSpan(new ForegroundColorSpan(ContextCompat.getColor(requireContext(),
-        //                R.color.colorStatusText)), 0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-        // receiveText.append(spn);
         statusText.setText(str);
     }
 
@@ -794,9 +754,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     // Blank line between reports
                     receiveText.append("\n");
                 },
-                error -> {
-                    receiveText.append("Error in web response\n");
-                }
+                error -> receiveText.append("Error in web response\n")
         );
         queue.add(stringRequest);
     }
@@ -862,7 +820,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onSerialIoError(Exception e) {
         status("USB connection lost, please reconnect");
-        ((Activity) getContext()).getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        ((Activity) requireContext()).getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         disconnect();
     }
 // End SerialListener
