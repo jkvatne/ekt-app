@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="MotimeEktInput">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2024-05-29T11:47:43.496633900Z">
+        <DropdownSelection timestamp="2025-06-06T07:40:41.832875600Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="PhysicalDevice" identifier="serial=29011JEGR21879" />
+              <DeviceId pluginId="Default" identifier="serial=10.0.0.4:41471;connection=5671307b" />
             </handle>
           </Target>
         </DropdownSelection>

@@ -121,7 +121,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         portNum = getArguments().getInt("port");
         String deviceName = getArguments().getString("name");
         if (deviceName.equals("Emit eScan")) eScanOk = true;
-        baudRate = 9600;
+        if (deviceName.equals("FT232R USB UART")) eScanOk = true;
+        baudRate = 115200;
         queue = Volley.newRequestQueue(this.requireActivity());
         cBuf = new CircularBuffer(20480);
         byte[] buf = BuildConfig.SERVER_URL.getBytes();
@@ -626,8 +627,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 mtrOk = true;
                 eScanOk = false;
                 receiveMtr(data);
-            } else if ((data.length>3)&&(data[2]=='e')&&(data[3]=='S')
-                    ||(data.length>3)&&(data[0]=='e')&&(data[1]=='S')&&(data[2]=='c')) {
+            } else if ((data.length>3)&&(data[0]==2)&&(data[1]=='I')) {
                 eScanOk = true;
                 mtrOk = false;
             }
