@@ -42,7 +42,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.Locale;
-import java.util.Objects;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
@@ -237,9 +236,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             receiveText.setText("");
             cBuf.clear();
             return true;
-        } else {
-            return super.onOptionsItemSelected(item);
         }
+        return false;
     }
 
     /*
@@ -369,7 +367,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private void send(String str) {
         str = str + "\r\n";
         if (connected != Connected.True) {
-            Toast.makeText(getActivity(), "Ikke kontakt med avleser. Ta ut og plugg inn på nytt", Toast.LENGTH_LONG).show();
+            Toast.makeText(getActivity(), getString(R.string.no_contact), Toast.LENGTH_LONG).show();
             return;
         }
         try {
@@ -512,16 +510,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         for (byte datum : data) {
             cBuf.put(datum);
         }
-        /*if (cBuf.Has(2) && cBuf.Has(3)) {
-            cBuf.SkipTo(2);  // Skip to STX
-            String s1 = cBuf.getString();
-            String s2 = cBuf.getString();
-            String s3 = cBuf.getString();
-            receiveText.append(s1+" "+s2+" "+s3+"\n");
-            cBuf.clear();
-
-            // Skip to FFFF and check length
-        } else */
         if (cBuf.foundMessage()) {
             byte[] buf = new byte[256];
             int CurrentSize;
@@ -564,11 +552,11 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     diff += 60;
                 }
                 if (y!=buf[8] || mo!=buf[9] || d!=buf[10] || h!=buf[11] || mi!=buf[12] || diff>2) {
-                    receiveText.append("Oppdaterer MTR klokke\n");
+                    receiveText.append(getString(R.string.update_mtr_clock));
                     send("/SC"+(char)y+(char)mo+(char)d+(char)h+(char)mi+(char)s);
                     try { MILLISECONDS.sleep(100);} catch (Exception ignored) {}
                 } else {
-                    receiveText.append("MTR klokke OK\n\n");
+                    receiveText.append(getString(R.string.mtr_clock_ok));
                 }
             } else if (CurrentSize > 0) {
                 receiveText.append(String.format(Locale.ROOT, "nextPut=%d  nextGet=%d\n", cBuf.nextPut,
@@ -604,13 +592,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     // SpoolEkt will read all records starting at given number from the MTR3/4.
     void SpoolPackage(int no) {
         if (mtrOk) {
-            receiveText.append("Henter pakker fra nr. " + no + "\n");
+            receiveText.append(getString(R.string.spool_from) + no + "\n");
             // Send /SBnnnn
             byte[] data = {0x2F, 0x53, 0x42, (byte) (no & 0xFF), (byte) ((no >> 8) & 0xFF),
                     (byte) ((no >> 16) & 0xFF), (byte) ((no >> 24) & 0xFF)};
             sendbytes(data);
         } else if (eScanOk) {
-            receiveText.append("Henter alle avlesninger\n");
+            receiveText.append(getString(R.string.spool_all));
             //  Send /QD<cr><lf>
             //byte[] data = {0x2F, 0x51, 0x44, 0x0D, 0x0A};
             //  Send /QM<cr><lf>
@@ -627,12 +615,12 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         byte[] b = str.getBytes();
         byte[] data2 = {0x2F, 0x53, 0x43, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], 0x0D, 0x0A };
         sendbytes(data2);
-        receiveText.append("Klokken er nå oppdatert\n");
+        receiveText.append(getString(R.string.clock_is_updated));
         try { MILLISECONDS.sleep(100);} catch (Exception ignored) {}
 
         // Send /CL
         byte[] data = {0x2F, 0x43, 0x4C, 0x0D, 0x0A};
-        receiveText.append("Alle data er slettet\n");
+        receiveText.append(getString(R.string.all_deleted));
         sendbytes(data);
     }
 
