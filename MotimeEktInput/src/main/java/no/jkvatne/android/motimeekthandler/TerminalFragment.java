@@ -9,13 +9,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
-import android.annotation.SuppressLint;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.text.SpannableStringBuilder;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -33,11 +31,9 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
-import com.hoho.android.usbserial.driver.CdcAcmSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
-import com.hoho.android.usbserial.driver.ProbeTable;
 import com.hoho.android.usbserial.util.SerialInputOutputManager;
 
 import java.io.IOException;
@@ -47,8 +43,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.Locale;
-import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
@@ -66,7 +60,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private enum UsbPermission {Unknown, Requested, Granted, Denied}
 
     private SerialService service;
-    private boolean initialStart = true;
     private static final String INTENT_ACTION_GRANT_USB = BuildConfig.APPLICATION_ID + ".GRANT_USB";
     private static final int WRITE_WAIT_MILLIS = 2000;
     private int portNum, baudRate;
@@ -91,7 +84,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private int day;
     private int month;
     private int year;
-    private LocalDateTime eScanLastStatusTime;
     public boolean eScanOk = false;
     public boolean mtrOk = false;
 
@@ -115,14 +107,18 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setHasOptionsMenu(true);
-        setRetainInstance(true);
+        // setHasOptionsMenu(true);
+        // setRetainInstance(true);
         assert getArguments() != null;
         portNum = getArguments().getInt("port");
         String deviceName = getArguments().getString("name");
-        if (deviceName.equals("Emit eScan")) eScanOk = true;
-        if (deviceName.equals("FT232R USB UART")) eScanOk = true;
-        baudRate = 115200;
+        //if (deviceName.equals("Emit eScan")) eScanOk = true;
+        if (deviceName.equals("FT232R USB UART")) {
+            baudRate = 115200;
+        } else {
+            baudRate = 9600;
+        }
+
         queue = Volley.newRequestQueue(this.requireActivity());
         cBuf = new CircularBuffer(20480);
         byte[] buf = BuildConfig.SERVER_URL.getBytes();
@@ -174,7 +170,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         super.onResume();
         // Did have if (initialStart &&...
         if (service != null) {
-            initialStart = false;
             requireActivity().runOnUiThread(this::connect);
         }
         /*
@@ -199,7 +194,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         service.attach(this);
         // Did have if (initialStart &&...
         if (isResumed()) {
-            initialStart = false;
             requireActivity().runOnUiThread(this::connect);
         }
     }
@@ -452,15 +446,17 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 String s = cBuf.getString();
                 if (s.isEmpty()) break;
                 if (ch == 'A') {
-                    batterySts = s.substring(s.length()-3);
+                    batterySts = s.substring(s.length()-4);
                     if (batterySts.charAt(0)=='-') batterySts = batterySts.substring(1);
+                    if (batterySts.endsWith("B")) {
+                        batterySts = batterySts.substring(0, batterySts.length()-1);
+                    }
                 } else if (ch == 'W') {
                     ecbTime = s.substring(1);
                 } else if (ch == 'M') {
                     messNo = s.substring(1);
                 }
             }
-            eScanLastStatusTime = LocalDateTime.now();
             if (ecbTime.length()>4) {
                 statusText.setText(getString(R.string.escan_sts,
                         ecbTime.substring(0,ecbTime.length()-4), batterySts, messNo));
