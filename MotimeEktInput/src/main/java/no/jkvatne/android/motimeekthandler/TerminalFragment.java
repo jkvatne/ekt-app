@@ -380,7 +380,12 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
 
     private void receiveEcb(byte[] data) {
-        int ektNo; int messLen;
+        int messLen = 0;
+        int ektNo = 0;
+        int tagNo=0;
+        int eScanCtrlNo = 0;
+        int recordNo = 0;
+        int protocolType = 0;
         // Copy data into circular buffer
         for (byte c : data) {
             cBuf.put(c);
@@ -432,13 +437,39 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             byte[] buf = new byte[256];
             while (!cBuf.isEmpty() && cBuf.last() != 0x03 && cBuf.last() != 0x00) {
                 byte b = cBuf.last();
-                if ((b == 'N') || (b == 'S')) {
+                if (b == 'N') {
+                    // N  is the custom tag number, normally equal to the internal, permanent tag number
                     cBuf.skip(1);
-                    // N or S is the ekt number
                     ektNo = cBuf.parseInt();
                     buf[20] = (byte) (ektNo & 0xFF);
                     buf[21] = (byte) ((ektNo >> 8) & 0xFF);
                     buf[22] = (byte) ((ektNo >> 16) & 0xFF);
+                } else if (b == 'M') {
+                    // M is Tag passing number (eScan record number, starting at 0 for a new race)
+                    cBuf.skip(1);
+                    recordNo = cBuf.parseInt();
+                } else if (b == 'C') {
+                    // Control code of the eScan reader, typically 250.
+                    cBuf.skip(1);
+                    eScanCtrlNo = cBuf.parseInt();
+                } else if (b == 'L') {
+                    // Emitag version, skip the text (0120)
+                    cBuf.getString();
+                } else if (b == 'X') {
+                    // Protocol type 0-7
+                    cBuf.skip(1);
+                    protocolType = cBuf.parseInt();
+                } else if (b == 'V') {
+                    // Power information, just skip it
+                    cBuf.getString();
+                } else if (b == 'S') {
+                    // S is the permanent tag number/serial number. Normally equal to the custom tag number.
+                    cBuf.skip(1);
+                    // N or S is the ekt number
+                    tagNo = cBuf.parseInt();
+                    buf[20] = (byte) (tagNo & 0xFF);
+                    buf[21] = (byte) ((tagNo >> 8) & 0xFF);
+                    buf[22] = (byte) ((tagNo >> 16) & 0xFF);
                 } else if (b == 'W') {
                     cBuf.skip(1);
                     // Time when badge was read
@@ -491,8 +522,11 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
             char[] compressedData = new char[256];
             int totalTime = CompressTag(buf, compressedData);
-            if ((totalTime <= 0) || (no == 0)) {
-                receiveText.append("Unknown message from ekt reader\n");
+            if (protocolType>0) {
+                receiveText.append(String.format(Locale.ROOT, "Wrong protocol on eScan. Please change to Normal\n"));
+            }
+            if (no == 0) {
+                receiveText.append(String.format(Locale.ROOT, "Empty message from ekt reader, ektno=%d\n", ektNo));
             } else {
                 receiveText.append(String.format(Locale.ROOT, "%02d-%02d-%02d %02d:%02d:%02d ",
                         buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
