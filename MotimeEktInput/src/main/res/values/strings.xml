@@ -7,21 +7,24 @@
     <string name="server_ok">Web server OK</string>
     <string name="url_error">Appens URL er feil!\n(Sjekk apikey.properties)\n</string>
     <string name="unsupported_parameters">Unsupported parameters</string>
-    <string name="usb_connected">USB tilkoblett</string>
+    <string name="usb_connected">USB tilkoblet</string>
     <string name="connection_failed">USB forbindelse feilet</string>
     <string name="connection_failed2">USB forbindelse feilet eSCAN</string>
     <string name="perm_missing">Har ikke tillatelse til å koble til USB</string>
-
+    <string name="connection_lost">USB connection lost, please reconnect</string>
     <string name="do_download">"Vil du laste ned de siste avlesningene?</string>
     <string name="do_clear">"Vil du slette alle avlesninger i eScan?</string>
     <string name="download">"Last ned dagens løp"</string>
     <string name="status">"Status"</string>
-    <string name="escan_sts">"eScan ok %s, %s%% bat, %s"</string>
+    <string name="escan_sts">"Ok %s %s, Bat:%s%%, %s"</string>
     <string name="no_contact">"Ikke kontakt med avleser. Ta ut og plugg inn på nytt"</string>
     <string name="update_mtr_clock">"Oppdaterer MTR klokke\n"</string>
     <string name="mtr_clock_ok">"MTR klokke OK\n\n"</string>
-    <string name="spool_all">"Henter alle avlesninger\n"</string>
+    <string name="spool_all">"Henter alle avlesninger (/QD)\n"</string>
+    <string name="spool_today">"Henter alle dagens avlesninger (/QM)\n"</string>
     <string name="spool_from">"Henter pakker fra nr."</string>
     <string name="all_deleted">"Alle data er slettet\n"</string>
     <string name="clock_is_updated">"Klokken er nå oppdatert\n"</string>
+    <string name="date_is_updated">"Dato er nå oppdatert\n"</string>
+    <string name="unknown_package">"Ukjent pakke med %d tegn\n"</string>
 </resources>

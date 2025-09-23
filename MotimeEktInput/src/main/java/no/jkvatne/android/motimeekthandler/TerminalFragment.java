@@ -79,11 +79,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private boolean noWeb = true;
     private String batterySts = "";
     private String ecbTime = "";
+    private String ecbDate = "";
     private String messNo = "";
     private int day;
     private int month;
     private int year;
     public boolean eScanOk = false;
+    public boolean eScan2Ok = false;
     public boolean mtrOk = false;
 
     public TerminalFragment() {
@@ -109,7 +111,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         assert getArguments() != null;
         portNum = getArguments().getInt("port");
         String deviceName = getArguments().getString("name");
-        //if (deviceName.equals("Emit eScan")) eScanOk = true;
         if ((deviceName!=null) && deviceName.equals("FT232R USB UART")) {
             baudRate = 115200;
         } else {
@@ -278,6 +279,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private void connect() {
         eScanOk = false;
+        eScan2Ok = false;
         UsbDevice device = null;
         UsbManager usbManager = (UsbManager) requireActivity().getSystemService(Context.USB_SERVICE);
         for (UsbDevice v : usbManager.getDeviceList().values()) {
@@ -337,6 +339,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private void disconnect() {
         eScanOk = false;
+        eScan2Ok = false;
         connected = Connected.False;
         if (usbIoManager != null) {
             usbIoManager.setListener(null);
@@ -423,13 +426,15 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     }
                 } else if (ch == 'W') {
                     ecbTime = s.substring(1);
+                } else if (ch == 'U') {
+                    ecbDate = s.substring(1);
                 } else if (ch == 'M') {
                     messNo = s.substring(1);
                 }
             }
             if (ecbTime.length()>4) {
                 statusText.setText(getString(R.string.escan_sts,
-                        ecbTime.substring(0,ecbTime.length()-4), batterySts, messNo));
+                        ecbDate, ecbTime.substring(0,ecbTime.length()-4), batterySts, messNo));
             }
         } else {
             int tStart = 0;
@@ -595,21 +600,23 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             } else if (CurrentSize > 0) {
                 receiveText.append(String.format(Locale.ROOT, "nextPut=%d  nextGet=%d\n", cBuf.nextPut,
                         cBuf.nextGet));
-                receiveText.append("Ukjent pakke med " + CurrentSize + " bytes\n");
+                receiveText.append(getString(R.string.unknown_package, CurrentSize));
             }
         }
     }
 
     private void receive(ArrayDeque<byte[]> datas) {
         for (byte[] data : datas) {
-            if (eScanOk) {
+            if (eScanOk || eScan2Ok) {
                 receiveEcb(data);
             } else if (mtrOk) {
                 receiveMtr(data);
             } else if ((data.length>2)&&(data[0]==-1) && (data[1]==-1)) {
                 mtrOk = true;
                 receiveMtr(data);
-            } else if ((data.length>3)&&(data[0]==2)&&(data[1]=='I')) {
+            } else if ((data.length>3)&&(data[0]==2)&&(data[1]=='I')&&(data[2]=='E')&&(data[3]=='S')&&(data[7]=='2')) {
+                eScan2Ok = true;
+            } else if ((data.length>3)&&(data[0]==2)&&(data[1]=='I')&&(data[2]=='e')&&(data[3]=='S')) {
                 eScanOk = true;
             }
         }
@@ -633,9 +640,12 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             sendbytes(data);
         } else if (eScanOk) {
             receiveText.append(getString(R.string.spool_all));
-            //  Send /QD<cr><lf>
-            //byte[] data = {0x2F, 0x51, 0x44, 0x0D, 0x0A};
-            //  Send /QM<cr><lf>
+            //  Send Spool all = /QD<cr><lf>
+            byte[] data = {0x2F, 0x51, 0x44, 0x0D, 0x0A};
+            sendbytes(data);
+        } else if (eScan2Ok) {
+            receiveText.append(getString(R.string.spool_today));
+            //  Send spool today /QM<cr><lf>
             byte[] data = {0x2F, 0x51, 0x4D, 0x0D, 0x0A};
             sendbytes(data);
         }
@@ -650,6 +660,14 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         byte[] data2 = {0x2F, 0x53, 0x43, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], 0x0D, 0x0A };
         sendbytes(data2);
         receiveText.append(getString(R.string.clock_is_updated));
+        try { MILLISECONDS.sleep(100);} catch (Exception ignored) {}
+
+        // Set date /SD
+        str = ldt.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"));
+        b = str.getBytes();
+        byte[] data3 = {0x2F, 0x53, 0x44, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], b[9], 0x0D, 0x0A };
+        sendbytes(data3);
+        receiveText.append(getString(R.string.date_is_updated));
         try { MILLISECONDS.sleep(100);} catch (Exception ignored) {}
 
         // Send /CL
@@ -809,14 +827,14 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
      */
     @Override
     public void onSerialConnect() {
-        status("USB connected");
+        status((String) getText(R.string.usb_connected));
         connected = Connected.True;
         getStatus();
     }
 
     @Override
     public void onSerialConnectError(Exception e) {
-        status("connection failed: " + e.getMessage());
+        status(getText(R.string.connection_failed) + e.getMessage());
         disconnect();
     }
 
@@ -841,7 +859,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onSerialIoError(Exception e) {
-        status("USB connection lost, please reconnect");
+        status((String) getText(R.string.connection_lost));
         ((Activity) requireContext()).getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         disconnect();
     }
