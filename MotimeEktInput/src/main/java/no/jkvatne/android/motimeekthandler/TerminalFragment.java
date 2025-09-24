@@ -88,6 +88,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public boolean eScan2Ok = false;
     public boolean mtrOk = false;
 
+    public static void SetLogText(String s) {
+        // receiveText.append(s);
+    }
+
     public TerminalFragment() {
         broadcastReceiver = new BroadcastReceiver() {
             @Override

@@ -27,4 +27,16 @@
     <string name="clock_is_updated">"Klokken er nå oppdatert\n"</string>
     <string name="date_is_updated">"Dato er nå oppdatert\n"</string>
     <string name="unknown_package">"Ukjent pakke med %d tegn\n"</string>
+    <!-- BLE -->
+    <string name="ble_not_supported">Bluetooth LE is not supported on this phone</string>
+    <string name="turning_ble_on">Trying to turn on Bluetooth</string>
+    <string name="ble_connecting">Device found, connecting&#8230;</string>
+    <string name="ble_data_received">Communication OK</string>
+    <string name="ble_device_not_found">Device not found</string>
+    <string name="ble_lost_connection">Connection lost</string>
+    <string name="downloading">Downloading</string>
+    <string name="ble_not_used">Bluetooth is not used</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="ble_scan">Scan</string>
+
 </resources>
