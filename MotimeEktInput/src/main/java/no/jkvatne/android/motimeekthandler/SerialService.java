@@ -192,6 +192,7 @@ public class SerialService extends Service implements SerialListener {
      * SerialListener
      */
     public void onSerialConnect() {
+        Log.i("ECB","onSerialConnect()");
         if(connected) {
             synchronized (this) {
                 if (listener != null) {
@@ -210,6 +211,7 @@ public class SerialService extends Service implements SerialListener {
     }
 
     public void onSerialConnectError(Exception e) {
+        Log.i("ECB","onSerialConnectError()");
         if(connected) {
             synchronized (this) {
                 if (listener != null) {
@@ -240,6 +242,7 @@ public class SerialService extends Service implements SerialListener {
      * While not consumed (2), add more data (3).
      */
     public void onSerialRead(byte[] data) {
+        Log.i("ECB","onSerialRead()");
         if(connected) {
             synchronized (this) {
                 try {
@@ -276,6 +279,7 @@ public class SerialService extends Service implements SerialListener {
     }
 
     public void onSerialIoError(Exception e) {
+        Log.i("ECB","onSerialIoError()");
         if(connected) {
             synchronized (this) {
                 if (listener != null) {

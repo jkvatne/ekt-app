@@ -416,6 +416,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         cBuf.skip(1);    // Get STX and ignore it
         id = cBuf.get();    // get first char
         if (id == 'I') {
+            Log.i("ECB","Status message");
             // This is a status message
             //String HwName = cBuf.getString();
             while (!cBuf.isEmpty() && cBuf.peek(0) >= 0x20) {
@@ -444,6 +445,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             int tStart = 0;
             int no = 0;
             byte[] buf = new byte[256];
+            Log.i("ECB","Badge message");
             while (!cBuf.isEmpty() && cBuf.last() != 0x03 && cBuf.last() != 0x00) {
                 byte b = cBuf.last();
                 if (b == 'N') {
@@ -476,6 +478,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     cBuf.skip(1);
                     // N or S is the ekt number
                     tagNo = cBuf.parseInt();
+                    Log.i("ECB","Badge message "+tagNo);
                     buf[20] = (byte) (tagNo & 0xFF);
                     buf[21] = (byte) ((tagNo >> 8) & 0xFF);
                     buf[22] = (byte) ((tagNo >> 16) & 0xFF);
