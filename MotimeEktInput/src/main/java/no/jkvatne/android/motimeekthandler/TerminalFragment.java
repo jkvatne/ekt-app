@@ -15,6 +15,7 @@ import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
@@ -91,6 +92,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public boolean eScan2Ok = false;
     public boolean mtrOk = false;
     private  boolean initialStart = true;
+    final Handler handler = new Handler();
+    private long lastMessageMs;
+
     public static void SetLogText(String s) {
         // receiveText.append(s);
     }
@@ -127,6 +131,24 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         cBuf = new CircularBuffer(20480);
         byte[] buf = BuildConfig.SERVER_URL.getBytes();
         ServerUrl = new String(buf, StandardCharsets.UTF_8);
+        lastMessageMs = 0;
+
+        final int delay = 2000; // milliseconds
+        handler.postDelayed(new Runnable() {
+            public void run() {
+                //Log.i("ECB","Running handler each 2 sec");
+                handler.postDelayed(this, delay);
+                long elapsedMs = android.os.SystemClock.elapsedRealtime();
+                if (lastMessageMs!=0) {
+                    if (elapsedMs>(lastMessageMs+6000)) {
+                        Log.e("ECB",">>>>>>>>>>>>> Timeout, no data <<<<<<<<<<<<<<<<");
+                        lastMessageMs = 0;
+                        status((String) getText(R.string.connection_lost));
+                        disconnect();
+                    }
+                }
+            }
+        }, delay);
     }
 
     @Override
@@ -135,6 +157,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             disconnect();
         requireActivity().stopService(new Intent(getActivity(), SerialService.class));
         super.onDestroy();
+        handler.removeCallbacksAndMessages(null);
     }
 
     @Override
@@ -250,7 +273,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     /*
      * Serial + UI
      */
-    private void connect() {
+    public void connect() {
+        Log.i("ECB", "Connecting to USB");
         eScanOk = false;
         eScan2Ok = false;
         UsbDevice device = null;
@@ -424,7 +448,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         cBuf.skip(1);    // Get STX and ignore it
         id = cBuf.get();    // get first char
         if (id == 'I') {
-            Log.i("ECB","Status message");
+            //Log.i("ECB","Status message");
             // This is a status message
             //String HwName = cBuf.getString();
             while (!cBuf.isEmpty() && cBuf.peek(0) >= 0x20) {
@@ -621,7 +645,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void receive(ArrayDeque<byte[]> datas) {
-        Log.i("ECB","Called receive()");
+        //Log.i("ECB","Called receive()");
+        lastMessageMs = android.os.SystemClock.elapsedRealtime();
         for (byte[] data : datas) {
             if (eScanOk || eScan2Ok) {
                 receiveEcb(data);

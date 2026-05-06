@@ -245,7 +245,7 @@ public class SerialService extends Service implements SerialListener {
      * While not consumed (2), add more data (3).
      */
     public void onSerialRead(byte[] data) {
-        Log.i("ECB","onSerialRead() "+data.length);
+        // Log.i("ECB","onSerialRead() "+data.length);
         if(connected) {
             synchronized (this) {
                 try {
