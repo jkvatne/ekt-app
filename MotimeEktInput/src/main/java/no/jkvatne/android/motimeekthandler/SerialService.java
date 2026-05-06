@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -104,6 +105,7 @@ public class SerialService extends Service implements SerialListener {
     }
 
     public void attach(SerialListener listener) {
+        Log.i("ECB","attach SerialListener");
         if(Looper.getMainLooper().getThread() != Thread.currentThread())
             throw new IllegalArgumentException("not in main thread");
         initNotification();
@@ -140,6 +142,7 @@ public class SerialService extends Service implements SerialListener {
         // items occurring later, will be moved directly to queue2
         // detach() and mainLooper.post run in the main thread, so all items are caught
         listener = null;
+        Log.i("ECB","detatch SerialListener");
     }
 
     private void initNotification() {
@@ -242,7 +245,7 @@ public class SerialService extends Service implements SerialListener {
      * While not consumed (2), add more data (3).
      */
     public void onSerialRead(byte[] data) {
-        Log.i("ECB","onSerialRead()");
+        Log.i("ECB","onSerialRead() "+data.length);
         if(connected) {
             synchronized (this) {
                 try {
@@ -270,11 +273,16 @@ public class SerialService extends Service implements SerialListener {
                         if (queue2.isEmpty() || queue2.getLast().type != QueueType.Read)
                             queue2.add(new QueueItem(QueueType.Read));
                         queue2.getLast().add(data);
+                        // PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+                        // PowerManager.WakeLock wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MyClassName::MyWakelockTag");
+                        // wakeLock.acquire(10000 /*mS*/);
                     }
                 } catch (Exception e) {
                     Log.e(SerialSocket.class.getSimpleName(), getString(R.string.connection_failed) + e.getMessage());
                 }
             }
+        } else {
+            Log.e("ECB","onSerialRead() but not connected");
         }
     }
 

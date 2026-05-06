@@ -166,7 +166,7 @@ public class DevicesFragment extends ListFragment {
         }
         if (!listItems.isEmpty()) {
             // Automaticaly start application when usb device is detected
-            startup();
+            // startup();
 
         }
         listAdapter.notifyDataSetChanged();

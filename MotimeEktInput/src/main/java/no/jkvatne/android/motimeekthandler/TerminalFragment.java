@@ -1,5 +1,6 @@
 package no.jkvatne.android.motimeekthandler;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.PendingIntent;
@@ -12,6 +13,7 @@ import android.content.ServiceConnection;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.text.method.ScrollingMovementMethod;
@@ -41,6 +43,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Locale;
 
 import com.android.volley.Request;
@@ -87,7 +90,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public boolean eScanOk = false;
     public boolean eScan2Ok = false;
     public boolean mtrOk = false;
-
+    private  boolean initialStart = true;
     public static void SetLogText(String s) {
         // receiveText.append(s);
     }
@@ -120,7 +123,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         } else {
             baudRate = 9600;
         }
-
         queue = Volley.newRequestQueue(this.requireActivity());
         cBuf = new CircularBuffer(20480);
         byte[] buf = BuildConfig.SERVER_URL.getBytes();
@@ -170,9 +172,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onResume() {
         super.onResume();
-        // Did have if (initialStart &&...
-        if (service != null) {
-            requireActivity().runOnUiThread(this::connect);
+        if(initialStart && service != null) {
+            initialStart = false;
+            getActivity().runOnUiThread(this::connect);
         }
     }
 
@@ -185,9 +187,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public void onServiceConnected(ComponentName name, IBinder binder) {
         service = ((SerialService.SerialBinder) binder).getService();
         service.attach(this);
-        // Did have if (initialStart &&...
-        if (isResumed()) {
-            requireActivity().runOnUiThread(this::connect);
+        if(initialStart && isResumed()) {
+            initialStart = false;
+            getActivity().runOnUiThread(this::connect);
         }
     }
 
@@ -248,6 +250,117 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     /*
      * Serial + UI
      */
+    private void connect() {
+        eScanOk = false;
+        eScan2Ok = false;
+        UsbDevice device = null;
+        UsbManager usbManager = (UsbManager) requireActivity().getSystemService(Context.USB_SERVICE);
+        for (UsbDevice v : usbManager.getDeviceList().values()) {
+            device = v;
+        }
+        if (device == null) {
+            status(getString(R.string.connection_failed));
+            return;
+        }
+        UsbSerialDriver driver = UsbSerialProber.getDefaultProber().probeDevice(device);
+        if (driver == null) {
+            driver = CustomProber.getCustomProber().probeDevice(device);
+        }
+        if (driver.getPorts().size() < portNum) {
+            //status("connection failed: not enough ports at device");
+            status(getString(R.string.connection_failed));
+            return;
+        }
+        usbSerialPort = driver.getPorts().get(portNum);
+        UsbDeviceConnection usbConnection = usbManager.openDevice(driver.getDevice());
+        // if (usbConnection == null && permissionGranted == null && !usbManager.hasPermission(driver.getDevice())) {
+        if (usbConnection == null && usbPermission == UsbPermission.Unknown && !usbManager.hasPermission(driver.getDevice())) {
+            usbPermission = UsbPermission.Requested;
+            PendingIntent usbPermissionIntent = PendingIntent.getBroadcast(getActivity(), 0,
+                    new Intent(INTENT_ACTION_GRANT_USB), PendingIntent.FLAG_IMMUTABLE);
+            usbManager.requestPermission(driver.getDevice(), usbPermissionIntent);
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (!service.areNotificationsEnabled() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 0);
+            }
+        }
+        if (usbConnection == null) {
+            if (!usbManager.hasPermission(driver.getDevice()))
+                status(getString(R.string.perm_missing));
+            else
+                status(getString(R.string.connection_failed));
+            return;
+        }
+
+        connected = Connected.Pending;
+        try {
+            usbSerialPort.open(usbConnection);
+            try {
+                usbSerialPort.setParameters(baudRate, 8, 1, UsbSerialPort.PARITY_NONE);
+            } catch (UnsupportedOperationException e) {
+                status(getString(R.string.unsupported_parameters));
+            }
+            SerialSocket socket = new SerialSocket(requireActivity().getApplicationContext(), usbConnection, usbSerialPort);
+            service.connect(socket);
+            // usb connect is not asynchronous. connect-success and connect-error are returned immediately from socket.connect
+            // for consistency to bluetooth/bluetooth-LE app use same SerialListener and SerialService classes
+            onSerialConnect();
+            status("Connected ok");
+            receiveText.append("USB connection ok\n");
+            getStatus();
+        } catch (Exception e) {
+            status(getString(R.string.connection_failed) + e.getMessage());
+            disconnect();
+        }
+    }
+
+    private void disconnect() {
+        eScanOk = false;
+        eScan2Ok = false;
+        connected = Connected.False;
+        if (usbIoManager != null) {
+            usbIoManager.setListener(null);
+            usbIoManager.stop();
+        }
+        usbIoManager = null;
+        if (usbSerialPort!=null) {
+            try {
+                usbSerialPort.close();
+            } catch (Exception ignored){
+            }
+        }
+        service.disconnect();
+        usbSerialPort = null;
+    }
+
+    private void sendbytes(byte[] data) {
+        if (connected != Connected.True) {
+            Toast.makeText(getActivity(), "not connected", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            usbSerialPort.write(data, WRITE_WAIT_MILLIS);
+        } catch (Exception e) {
+            status(e.getMessage());
+        }
+    }
+
+    private void send(String str) {
+        str = str + "\r\n";
+        if (connected != Connected.True) {
+            Toast.makeText(getActivity(), getString(R.string.no_contact), Toast.LENGTH_LONG).show();
+            return;
+        }
+        try {
+            byte[] data = (str).getBytes();
+            service.write(data);
+        } catch (Exception e) {
+            status(e.getMessage());
+        }
+    }
+
 
     public void onClear() {
         AlertDialog.Builder adb = new AlertDialog.Builder(requireActivity());
@@ -280,111 +393,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public void getStatus() {
         send("/ST");
     }
-
-    private void connect() {
-        eScanOk = false;
-        eScan2Ok = false;
-        UsbDevice device = null;
-        UsbManager usbManager = (UsbManager) requireActivity().getSystemService(Context.USB_SERVICE);
-        for (UsbDevice v : usbManager.getDeviceList().values()) {
-            device = v;
-        }
-        if (device == null) {
-                status(getString(R.string.connection_failed));
-            return;
-        }
-        UsbSerialDriver driver = UsbSerialProber.getDefaultProber().probeDevice(device);
-        if (driver == null) {
-            driver = CustomProber.getCustomProber().probeDevice(device);
-        }
-        if (driver.getPorts().size() < portNum) {
-            //status("connection failed: not enough ports at device");
-            status(getString(R.string.connection_failed));
-            return;
-        }
-        usbSerialPort = driver.getPorts().get(portNum);
-        UsbDeviceConnection usbConnection = usbManager.openDevice(driver.getDevice());
-        if (usbConnection == null && usbPermission == UsbPermission.Unknown && !usbManager.hasPermission(driver.getDevice())) {
-            usbPermission = UsbPermission.Requested;
-            PendingIntent usbPermissionIntent = PendingIntent.getBroadcast(getActivity(), 0,
-                    new Intent(INTENT_ACTION_GRANT_USB), PendingIntent.FLAG_IMMUTABLE);
-            usbManager.requestPermission(driver.getDevice(), usbPermissionIntent);
-            return;
-        }
-        if (usbConnection == null) {
-            if (!usbManager.hasPermission(driver.getDevice()))
-                status(getString(R.string.perm_missing));
-            else
-                status(getString(R.string.connection_failed));
-            return;
-        }
-
-        connected = Connected.Pending;
-        try {
-            usbSerialPort.open(usbConnection);
-            try {
-                usbSerialPort.setParameters(baudRate, 8, 1, UsbSerialPort.PARITY_NONE);
-            } catch (UnsupportedOperationException e) {
-                status(getString(R.string.unsupported_parameters));
-            }
-            SerialSocket socket = new SerialSocket(requireActivity().getApplicationContext(), usbConnection, usbSerialPort);
-            service.connect(socket);
-            // usb connect is not asynchronous. connect-success and connect-error are returned immediately from socket.connect
-            // for consistency to bluetooth/bluetooth-LE app use same SerialListener and SerialService classes
-            onSerialConnect();
-            send("/ST");
-            status("Connected ok");
-            receiveText.append("USB connection ok\n");
-        } catch (Exception e) {
-            status(getString(R.string.connection_failed) + e.getMessage());
-            disconnect();
-        }
-    }
-
-    private void disconnect() {
-        eScanOk = false;
-        eScan2Ok = false;
-        connected = Connected.False;
-        if (usbIoManager != null) {
-            usbIoManager.setListener(null);
-            usbIoManager.stop();
-        }
-        usbIoManager = null;
-        if (usbSerialPort!=null) {
-            try {
-                usbSerialPort.close();
-            } catch (Exception ignored){
-            }
-        }
-        usbSerialPort = null;
-    }
-
-    private void sendbytes(byte[] data) {
-        if (connected != Connected.True) {
-            Toast.makeText(getActivity(), "not connected", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        try {
-            usbSerialPort.write(data, WRITE_WAIT_MILLIS);
-        } catch (Exception e) {
-            status(e.getMessage());
-        }
-    }
-
-    private void send(String str) {
-        str = str + "\r\n";
-        if (connected != Connected.True) {
-            Toast.makeText(getActivity(), getString(R.string.no_contact), Toast.LENGTH_LONG).show();
-            return;
-        }
-        try {
-            byte[] data = (str).getBytes();
-            service.write(data);
-        } catch (Exception e) {
-            status(e.getMessage());
-        }
-    }
-
 
     private void receiveEcb(byte[] data) {
         int messLen = 0;
@@ -613,6 +621,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void receive(ArrayDeque<byte[]> datas) {
+        Log.i("ECB","Called receive()");
         for (byte[] data : datas) {
             if (eScanOk || eScan2Ok) {
                 receiveEcb(data);
@@ -623,8 +632,12 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 receiveMtr(data);
             } else if ((data.length>3)&&(data[0]==2)&&(data[1]=='I')&&(data[2]=='E')&&(data[3]=='S')&&(data[7]=='2')) {
                 eScan2Ok = true;
+                Log.i("ECB","received first eScan2 message");
+                receiveEcb(data);
             } else if ((data.length>3)&&(data[0]==2)&&(data[1]=='I')&&(data[2]=='e')&&(data[3]=='S')) {
                 eScanOk = true;
+                Log.i("ECB","received first eScan1 message");
+                receiveEcb(data);
             }
         }
     }
@@ -830,13 +843,33 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     /*
+     * starting with Android 14, notifications are not shown in notification bar by default when App is in background
+     */
+
+    private void showNotificationSettings() {
+        Intent intent = new Intent();
+        intent.setAction("android.settings.APP_NOTIFICATION_SETTINGS");
+        intent.putExtra("android.provider.extra.APP_PACKAGE", getActivity().getPackageName());
+        startActivity(intent);
+    }
+
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if(Arrays.equals(permissions, new String[]{Manifest.permission.POST_NOTIFICATIONS}) &&
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !service.areNotificationsEnabled())
+            showNotificationSettings();
+    }
+
+    /*
      * SerialListener
      */
     @Override
     public void onSerialConnect() {
         status((String) getText(R.string.usb_connected));
+        ((Activity) requireContext()).getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         connected = Connected.True;
-        getStatus();
+        //getStatus();
     }
 
     @Override

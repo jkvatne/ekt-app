@@ -38,6 +38,7 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         // Check that phone has BLE
+        /*
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             Toast.makeText(this,
                     R.string.ble_not_supported,
@@ -54,7 +55,7 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
             }
             ble=Ble.getInstance(this);
         }
-
+        */
     }
 
     @Override
@@ -72,8 +73,9 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
     protected void onNewIntent(Intent intent) {
         if("android.hardware.usb.action.USB_DEVICE_ATTACHED".equals(intent.getAction())) {
             TerminalFragment terminal = (TerminalFragment)getSupportFragmentManager().findFragmentByTag("terminal");
-            if (terminal != null)
+            if (terminal != null) {
                 terminal.status("USB device detected");
+            }
         }
         super.onNewIntent(intent);
     }
