@@ -141,7 +141,7 @@ public class Ble {
      * @param rxString is the string received
      */
     private void handleRxData(String rxString) {
-        TerminalFragment.SetLogText(rxString);
+        TerminalFragment.HandleBleString(rxString);
     }
 
 

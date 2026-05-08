@@ -53,8 +53,7 @@ public class DevicesFragment extends ListFragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setHasOptionsMenu(true);
-        listAdapter = new ArrayAdapter<ListItem>(requireActivity(), 0, listItems) {
+        listAdapter = new ArrayAdapter<>(requireActivity(), 0, listItems) {
             @SuppressLint("SetTextI18n")
             @NonNull
             @Override
@@ -64,13 +63,14 @@ public class DevicesFragment extends ListFragment {
                     view = requireActivity().getLayoutInflater().inflate(R.layout.device_list_item, parent, false);
                 TextView text1 = view.findViewById(R.id.text1);
                 TextView text2 = view.findViewById(R.id.text2);
-                if(item.driver == null) {
+                if (item.driver == null) {
                     text1.setText(R.string.no_driver);
-
-                } else if(item.driver.getPorts().size() == 1) {
-                    text1.setText(item.driver.getClass().getSimpleName().replace("SerialDriver", ""));
                 } else {
-                    text1.setText(item.driver.getClass().getSimpleName().replace("SerialDriver", "") + ", Port " + item.port);
+                    String s = item.driver.getClass().getSimpleName().replace("SerialDriver", "");
+                    if (item.driver.getPorts().size() != 1) {
+                        s = s + ", Port " + item.port;
+                    }
+                    text1.setText(s);
                 }
                 if (item.device.getVendorId()==8263) {
                     text1.setText("Emit eScan");
@@ -85,11 +85,10 @@ public class DevicesFragment extends ListFragment {
     public void onViewCreated(View v, Bundle savedInstanceState) {
         super.onViewCreated(v, savedInstanceState);
         setListAdapter(null);
-        View header = requireActivity().getLayoutInflater().inflate(R.layout.device_list_header,
-                null,
-                false);
+        @SuppressLint("InflateParams")
+        View header = requireActivity().getLayoutInflater().inflate(R.layout.device_list_header,null,false);
         getListView().addHeaderView(header, null, false);
-        setEmptyText("<Sett inn USB kabel>");
+        setEmptyText(getString(R.string.insert_cable));
         ((TextView) getListView().getEmptyView()).setTextSize(24);
         setListAdapter(listAdapter);
     }

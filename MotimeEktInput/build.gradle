@@ -37,10 +37,19 @@ android {
     }
     buildToolsVersion '36.0.0'
     ndkVersion '25.2.9519653'
+
+    packaging {
+        resources {
+            // Option 1: Pick the first occurrence found
+            pickFirsts += "META-INF/NOTICE.md"
+            pickFirsts += "META-INF/LICENSE.md"
+        }
+    }
 }
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.databinding:databinding-compiler:9.2.1'
     implementation 'com.google.android.material:material:1.13.0'
     implementation 'com.android.volley:volley:1.2.1'
     implementation 'androidx.core:core:1.18.0'

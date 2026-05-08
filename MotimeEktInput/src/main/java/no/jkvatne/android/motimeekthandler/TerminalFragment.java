@@ -95,8 +95,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     final Handler handler = new Handler();
     private long lastMessageMs;
 
-    public static void SetLogText(String s) {
-        // receiveText.append(s);
+    public static void HandleBleString(String s) {
+        // TODO: Handle BLE messages here
+        Log.i("BLE", "Got BLE message: "+s);
     }
 
     public TerminalFragment() {
@@ -197,7 +198,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         super.onResume();
         if(initialStart && service != null) {
             initialStart = false;
-            getActivity().runOnUiThread(this::connect);
+            requireActivity().runOnUiThread(this::connect);
         }
     }
 
@@ -212,7 +213,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         service.attach(this);
         if(initialStart && isResumed()) {
             initialStart = false;
-            getActivity().runOnUiThread(this::connect);
+            requireActivity().runOnUiThread(this::connect);
         }
     }
 
@@ -254,9 +255,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onCreateOptionsMenu(@NonNull Menu menu, MenuInflater inflater) {
         inflater.inflate(R.menu.menu_terminal, menu);
-    }
-
-    public void onPrepareOptionsMenu(@NonNull Menu menu) {
     }
 
     @Override
@@ -305,11 +303,11 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             usbManager.requestPermission(driver.getDevice(), usbPermissionIntent);
             return;
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (!service.areNotificationsEnabled() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 0);
-            }
+        //if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (!service.areNotificationsEnabled() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 0);
         }
+        //}
         if (usbConnection == null) {
             if (!usbManager.hasPermission(driver.getDevice()))
                 status(getString(R.string.perm_missing));
@@ -359,7 +357,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         usbSerialPort = null;
     }
 
-    private void sendbytes(byte[] data) {
+    private void SendBytes(byte[] data) {
         if (connected != Connected.True) {
             Toast.makeText(getActivity(), "not connected", Toast.LENGTH_SHORT).show();
             return;
@@ -419,7 +417,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void receiveEcb(byte[] data) {
-        int messLen = 0;
+        int messLen;
         int ektNo = 0;
         int tagNo=0;
         int eScanCtrlNo = 0;
@@ -449,8 +447,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         id = cBuf.get();    // get first char
         if (id == 'I') {
             //Log.i("ECB","Status message");
-            // This is a status message
-            //String HwName = cBuf.getString();
             while (!cBuf.isEmpty() && cBuf.peek(0) >= 0x20) {
                 byte ch = cBuf.peek(0);
                 String s = cBuf.getString();
@@ -510,7 +506,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     cBuf.skip(1);
                     // N or S is the ekt number
                     tagNo = cBuf.parseInt();
-                    Log.i("ECB","Badge message "+tagNo);
                     buf[20] = (byte) (tagNo & 0xFF);
                     buf[21] = (byte) ((tagNo >> 8) & 0xFF);
                     buf[22] = (byte) ((tagNo >> 16) & 0xFF);
@@ -549,7 +544,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     cBuf.skip(1);  // Skip ":"
                     int sec = cBuf.parseInt();
                     cBuf.skip(1);  // Skip "."
-                    //int msec = cBuf.parseInt();
+                    //int milliSecond = cBuf.parseInt();
                     // Save data to buffer
                     buf[3 * no + 26] = (byte) control;
                     int t = sec + min * 60 + hrs * 3600;
@@ -561,16 +556,16 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     // Skip the text
                     cBuf.getString();
                 }
-
             }
+            Log.i("ECB",getString(R.string.badge_message, tagNo, eScanCtrlNo, recordNo));
 
             char[] compressedData = new char[256];
             int totalTime = CompressTag(buf, compressedData);
             if (protocolType>0) {
-                receiveText.append(String.format(Locale.ROOT, "Wrong protocol on eScan. Please change to Normal\n"));
+                receiveText.append(getString(R.string.wrong_protocol));
             }
             if (no == 0) {
-                receiveText.append(String.format(Locale.ROOT, "Empty message from ekt reader, ektno=%d\n", ektNo));
+                receiveText.append(getString(R.string.empty_message, ektNo));
             } else {
                 receiveText.append(String.format(Locale.ROOT, "%02d-%02d-%02d %02d:%02d:%02d ",
                         buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
@@ -615,7 +610,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                             + (((int) buf[19] & 0xFF) << 16)+(((int) buf[20] & 0xFF) << 24);
                 prevNo = ((int) buf[25] & 0xFF) + (((int) buf[26] & 0xFF) << 8)
                         + (((int) buf[27] & 0xFF) << 16)+(((int) buf[28] & 0xFF) << 24);
-                receiveText.append(String.format(Locale.ROOT, "Siste løp har %d brikker\n", recNo-prevNo+1));
+                receiveText.append(getString(R.string.last_count, recNo-prevNo+1));
 
                 // Get current time and compare
                 LocalDateTime t = LocalDateTime.now();
@@ -637,17 +632,15 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     receiveText.append(getString(R.string.mtr_clock_ok));
                 }
             } else if (CurrentSize > 0) {
-                receiveText.append(String.format(Locale.ROOT, "nextPut=%d  nextGet=%d\n", cBuf.nextPut,
-                        cBuf.nextGet));
                 receiveText.append(getString(R.string.unknown_package, CurrentSize));
             }
         }
     }
 
-    private void receive(ArrayDeque<byte[]> datas) {
+    private void receive(ArrayDeque<byte[]> dataStrings) {
         //Log.i("ECB","Called receive()");
         lastMessageMs = android.os.SystemClock.elapsedRealtime();
-        for (byte[] data : datas) {
+        for (byte[] data : dataStrings) {
             if (eScanOk || eScan2Ok) {
                 receiveEcb(data);
             } else if (mtrOk) {
@@ -667,32 +660,32 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
     }
 
-    // GetEkt will read one record from the MTR3/4.
+    // GetPackage will read one record from the MTR3/4.
     void GetPackage(int no) {
         // Sending /GBxxxx with binary x
         byte[] data = {0x2F, 0x47, 0x42, (byte) (no & 0xFF), (byte) ((no >> 8) & 0xFF), (byte) ((no >> 16) & 0xFF),
                 (byte) ((no >> 24) & 0xFF)};
-        sendbytes(data);
+        SendBytes(data);
     }
 
-    // SpoolEkt will read all records starting at given number from the MTR3/4.
+    // SpoolPackage will read all records starting at given number from the MTR3/4.
     void SpoolPackage(int no) {
         if (mtrOk) {
             receiveText.append(getString(R.string.spool_from) + no + "\n");
             // Send /SBnnnn
             byte[] data = {0x2F, 0x53, 0x42, (byte) (no & 0xFF), (byte) ((no >> 8) & 0xFF),
                     (byte) ((no >> 16) & 0xFF), (byte) ((no >> 24) & 0xFF)};
-            sendbytes(data);
+            SendBytes(data);
         } else if (eScanOk) {
             receiveText.append(getString(R.string.spool_all));
             //  Send Spool all = /QD<cr><lf>
             byte[] data = {0x2F, 0x51, 0x44, 0x0D, 0x0A};
-            sendbytes(data);
+            SendBytes(data);
         } else if (eScan2Ok) {
             receiveText.append(getString(R.string.spool_today));
             //  Send spool today /QM<cr><lf>
             byte[] data = {0x2F, 0x51, 0x4D, 0x0D, 0x0A};
-            sendbytes(data);
+            SendBytes(data);
         }
 
     }
@@ -703,7 +696,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         String str = ldt.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
         byte[] b = str.getBytes();
         byte[] data2 = {0x2F, 0x53, 0x43, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], 0x0D, 0x0A };
-        sendbytes(data2);
+        SendBytes(data2);
         receiveText.append(getString(R.string.clock_is_updated));
         try { MILLISECONDS.sleep(100);} catch (Exception ignored) {}
 
@@ -711,14 +704,14 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         str = ldt.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"));
         b = str.getBytes();
         byte[] data3 = {0x2F, 0x53, 0x44, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], b[9], 0x0D, 0x0A };
-        sendbytes(data3);
+        SendBytes(data3);
         receiveText.append(getString(R.string.date_is_updated));
         try { MILLISECONDS.sleep(100);} catch (Exception ignored) {}
 
         // Send /CL
         byte[] data = {0x2F, 0x43, 0x4C, 0x0D, 0x0A};
         receiveText.append(getString(R.string.all_deleted));
-        sendbytes(data);
+        SendBytes(data);
     }
 
     void status(String str) {
@@ -733,54 +726,54 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         return b64chars[x];
     }
 
-    private int bb(byte[] brikke_buffer, int i) {
+    private int bb(byte[] badge_buffer, int i) {
         // Convert byte to an integer between 0 and 255
-        return (int) brikke_buffer[i] & 0xff;
+        return (int) badge_buffer[i] & 0xff;
     }
 
-    int CompressTag(byte[] brikke_buffer, char[] compressedData) {
+    int CompressTag(byte[] badge_buffer, char[] compressedData) {
         int pos = 0;
         int i;
         int prev_tid = 0;
         int totalTime = 0;
         //byte[] compressedData = new byte[256];
-        // Protokollnummer er første byte
+        // Protocol number is in first byte
         compressedData[pos++] = b64(49);
-        // Batterispenning, 1 tegn (x=0..63 = spenning/0.1 = 0..=6.3V
+        // Battery voltage, 1 character (x=0..63 = voltage/0.1 = 0..6.3. Default to max
         int bv = 63;
         compressedData[pos++] = b64(bv);
-        // Avlest tid, 5 tegn, år modulo 16, |YYYYMM|MMDDDD|DHHHHH|MMMMMM|SSSSSS
+        // Measured time, 5 char, year modulo 16, |YYYYMM|MMDDDD|DHHHHH|MMMMMM|SSSSSS
         // Year is years after 1900 mod 16, so 2022 is 10 (0xA). Add 2012
         // Month is 0-11
         compressedData[pos++] =
-                b64((((bb(brikke_buffer, 8) + 1900) & 0x0F) << 2) + ((bb(brikke_buffer, 9) >> 2) & 3));
+                b64((((bb(badge_buffer, 8) + 1900) & 0x0F) << 2) + ((bb(badge_buffer, 9) >> 2) & 3));
         compressedData[pos++] =
-                b64((((bb(brikke_buffer, 9)) & 3) << 4) + ((bb(brikke_buffer, 10) >> 1) & 0x0F));
+                b64((((bb(badge_buffer, 9)) & 3) << 4) + ((bb(badge_buffer, 10) >> 1) & 0x0F));
         compressedData[pos++] =
-                b64(((bb(brikke_buffer, 10) & 1) << 5) + (bb(brikke_buffer, 11) & 31));
+                b64(((bb(badge_buffer, 10) & 1) << 5) + (bb(badge_buffer, 11) & 31));
         compressedData[pos++] =
-                b64(bb(brikke_buffer, 12) & 0x3f);  // Minutes
+                b64(bb(badge_buffer, 12) & 0x3f);  // Minutes
         compressedData[pos++] =
-                b64(bb(brikke_buffer, 13) & 0x3f);  // Seconds
-        // Antall poster (fylles inn senere)
+                b64(bb(badge_buffer, 13) & 0x3f);  // Seconds
+        // Number of controls (filled in later)
         compressedData[pos++] = b64(0);
-        // Brikkenummer
+        // Badge number
         //    3       2      1     0
         // |cccccc|ccbbbb|bbbbaa|aaaaaa|
         compressedData[pos++] =
-                b64(bb(brikke_buffer, 20) & 0x3F);
+                b64(bb(badge_buffer, 20) & 0x3F);
         compressedData[pos++] =
-                b64(((bb(brikke_buffer, 20) >> 6) & 0x03) | ((bb(brikke_buffer, 21) & 0x0f) << 2));
+                b64(((bb(badge_buffer, 20) >> 6) & 0x03) | ((bb(badge_buffer, 21) & 0x0f) << 2));
         compressedData[pos++] =
-                b64(((bb(brikke_buffer, 21) >> 4) & 0x0f) | ((bb(brikke_buffer, 22) & 0x03) << 4));
+                b64(((bb(badge_buffer, 21) >> 4) & 0x0f) | ((bb(badge_buffer, 22) & 0x03) << 4));
         compressedData[pos++] =
-                b64(((bb(brikke_buffer, 22) >> 2) & 0x3f));
+                b64(((bb(badge_buffer, 22) >> 2) & 0x3f));
         // Control codes
         for (i = 0; i < 50; i++) {
-            int post = bb(brikke_buffer, 3 * i + 26);
-            int posttid = (bb(brikke_buffer, 27 + 3 * i) & 0xFF) + ((bb(brikke_buffer, 28 + 3 * i) & 0xFF) << 8);
-            int tid = posttid - prev_tid;
-            prev_tid = posttid;
+            int post = bb(badge_buffer, 3 * i + 26);
+            int controlTime = (bb(badge_buffer, 27 + 3 * i) & 0xFF) + ((bb(badge_buffer, 28 + 3 * i) & 0xFF) << 8);
+            int tid = controlTime - prev_tid;
+            prev_tid = controlTime;
             if (i > 0 && post == 0) break;
             if (tid <= 511) {
                 // |0ttttt|ttttpp|pppppp|
@@ -793,7 +786,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             compressedData[pos++] = b64(((post >> 6) & 0x03) | ((tid & 0x0f) << 2));
             compressedData[pos++] = b64((post & 0x3F));
             if (post < 250) {
-                totalTime = posttid;
+                totalTime = controlTime;
             }
         }
 
@@ -874,16 +867,16 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private void showNotificationSettings() {
         Intent intent = new Intent();
         intent.setAction("android.settings.APP_NOTIFICATION_SETTINGS");
-        intent.putExtra("android.provider.extra.APP_PACKAGE", getActivity().getPackageName());
+        intent.putExtra("android.provider.extra.APP_PACKAGE", requireActivity().getPackageName());
         startActivity(intent);
     }
 
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        if(Arrays.equals(permissions, new String[]{Manifest.permission.POST_NOTIFICATIONS}) &&
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !service.areNotificationsEnabled())
+        if(Arrays.equals(permissions, new String[]{Manifest.permission.POST_NOTIFICATIONS}) && !service.areNotificationsEnabled()) {
             showNotificationSettings();
+        }
     }
 
     /*
@@ -905,18 +898,18 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onSerialRead(byte[] data) {
-        ArrayDeque<byte[]> datas = new ArrayDeque<>();
-        datas.add(data);
+        ArrayDeque<byte[]> dataStrings = new ArrayDeque<>();
+        dataStrings.add(data);
         try {
-            receive(datas);
+            receive(dataStrings);
         } catch (Exception ignored) {
 
         }
     }
 
-    public void onSerialRead(ArrayDeque<byte[]> datas) {
+    public void onSerialRead(ArrayDeque<byte[]> dataStrings) {
         try {
-            receive(datas);
+            receive(dataStrings);
         } catch (Exception ignored) {
 
         }

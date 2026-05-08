@@ -8,15 +8,12 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Binder;
-import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
-import android.os.PowerManager;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
 import androidx.core.app.NotificationCompat;
 
 import java.io.IOException;
@@ -36,15 +33,15 @@ public class SerialService extends Service implements SerialListener {
 
     private static class QueueItem {
         QueueType type;
-        ArrayDeque<byte[]> datas;
+        ArrayDeque<byte[]> dataStrings;
         Exception e;
 
         QueueItem(QueueType type) { this.type=type; if(type==QueueType.Read) init(); }
         QueueItem(QueueType type, Exception e) { this.type=type; this.e=e; }
-        QueueItem(QueueType type, ArrayDeque<byte[]> datas) { this.type=type; this.datas=datas; }
+        QueueItem(QueueType type, ArrayDeque<byte[]> dataStrings) { this.type=type; this.dataStrings =dataStrings; }
 
-        void init() { datas = new ArrayDeque<>(); }
-        void add(byte[] data) { datas.add(data); }
+        void init() { dataStrings = new ArrayDeque<>(); }
+        void add(byte[] data) { dataStrings.add(data); }
     }
 
     private final Handler mainLooper;
@@ -57,7 +54,7 @@ public class SerialService extends Service implements SerialListener {
     private boolean connected;
 
     /**
-     * Lifecylce
+     * Lifecycle
      */
     public SerialService() {
         mainLooper = new Handler(Looper.getMainLooper());
@@ -119,7 +116,7 @@ public class SerialService extends Service implements SerialListener {
             switch(item.type) {
                 case Connect:       listener.onSerialConnect      (); break;
                 case ConnectError:  listener.onSerialConnectError (item.e); break;
-                case Read:          listener.onSerialRead         (item.datas); break;
+                case Read:          listener.onSerialRead         (item.dataStrings); break;
                 case IoError:       listener.onSerialIoError      (item.e); break;
             }
         }
@@ -127,7 +124,7 @@ public class SerialService extends Service implements SerialListener {
             switch(item.type) {
                 case Connect:       listener.onSerialConnect      (); break;
                 case ConnectError:  listener.onSerialConnectError (item.e); break;
-                case Read:          listener.onSerialRead         (item.datas); break;
+                case Read:          listener.onSerialRead         (item.dataStrings); break;
                 case IoError:       listener.onSerialIoError      (item.e); break;
             }
         }
@@ -142,19 +139,16 @@ public class SerialService extends Service implements SerialListener {
         // items occurring later, will be moved directly to queue2
         // detach() and mainLooper.post run in the main thread, so all items are caught
         listener = null;
-        Log.i("ECB","detatch SerialListener");
+        Log.i("ECB","detach SerialListener");
     }
 
     private void initNotification() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel nc = new NotificationChannel(Constants.NOTIFICATION_CHANNEL, "Background service", NotificationManager.IMPORTANCE_LOW);
-            nc.setShowBadge(false);
-            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            nm.createNotificationChannel(nc);
-        }
+        NotificationChannel nc = new NotificationChannel(Constants.NOTIFICATION_CHANNEL, "Background service", NotificationManager.IMPORTANCE_LOW);
+        nc.setShowBadge(false);
+        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        nm.createNotificationChannel(nc);
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     public boolean areNotificationsEnabled() {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         NotificationChannel nc = nm.getNotificationChannel(Constants.NOTIFICATION_CHANNEL);
@@ -169,12 +163,12 @@ public class SerialService extends Service implements SerialListener {
                 .setClassName(this, Constants.INTENT_CLASS_MAIN_ACTIVITY)
                 .setAction(Intent.ACTION_MAIN)
                 .addCategory(Intent.CATEGORY_LAUNCHER);
-        int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0;
+        int flags = PendingIntent.FLAG_IMMUTABLE;
         PendingIntent disconnectPendingIntent = PendingIntent.getBroadcast(this, 1, disconnectIntent, flags);
         PendingIntent restartPendingIntent = PendingIntent.getActivity(this, 1, restartIntent,  flags);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, Constants.NOTIFICATION_CHANNEL)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setColor(getResources().getColor(R.color.colorPrimary))
+                .setColor(getResources().getColor(R.color.colorPrimary, null))
                 .setContentTitle(getResources().getString(R.string.app_name))
                 .setContentText(socket != null ? "Connected to "+socket.getName() : "Background Service")
                 .setContentIntent(restartPendingIntent)
@@ -234,13 +228,12 @@ public class SerialService extends Service implements SerialListener {
         }
     }
 
-    public void onSerialRead(ArrayDeque<byte[]> datas) { throw new UnsupportedOperationException(); }
+    public void onSerialRead(ArrayDeque<byte[]> dataStrings) { throw new UnsupportedOperationException(); }
 
     /**
      * reduce number of UI updates by merging data chunks.
-     * Data can arrive at hundred chunks per second, but the UI can only
+     * Data can arrive at >100 chunks per second, but the UI can only
      * perform a dozen updates if receiveText already contains much text.
-     *
      * On new data inform UI thread once (1).
      * While not consumed (2), add more data (3).
      */
@@ -252,20 +245,20 @@ public class SerialService extends Service implements SerialListener {
                     if (listener != null) {
                         boolean first;
                         synchronized (lastRead) {
-                            first = lastRead.datas.isEmpty(); // (1)
+                            first = lastRead.dataStrings.isEmpty(); // (1)
                             lastRead.add(data); // (3)
                         }
                         if (first) {
                             mainLooper.post(() -> {
-                                ArrayDeque<byte[]> datas;
+                                ArrayDeque<byte[]> dataStrings;
                                 synchronized (lastRead) {
-                                    datas = lastRead.datas;
+                                    dataStrings = lastRead.dataStrings;
                                     lastRead.init(); // (2)
                                 }
                                 if (listener != null) {
-                                    listener.onSerialRead(datas);
+                                    listener.onSerialRead(dataStrings);
                                 } else {
-                                    queue1.add(new QueueItem(QueueType.Read, datas));
+                                    queue1.add(new QueueItem(QueueType.Read, dataStrings));
                                 }
                             });
                         }
@@ -273,9 +266,6 @@ public class SerialService extends Service implements SerialListener {
                         if (queue2.isEmpty() || queue2.getLast().type != QueueType.Read)
                             queue2.add(new QueueItem(QueueType.Read));
                         queue2.getLast().add(data);
-                        // PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-                        // PowerManager.WakeLock wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MyClassName::MyWakelockTag");
-                        // wakeLock.acquire(10000 /*mS*/);
                     }
                 } catch (Exception e) {
                     Log.e(SerialSocket.class.getSimpleName(), getString(R.string.connection_failed) + e.getMessage());

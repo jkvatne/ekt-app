@@ -35,14 +35,15 @@ The webserver tid.nook.no is the only server supported,
 but it can easily be modified to support other servers.
 
 ## Debugging
- 
- To connect over WiFi, go to developer settings, Wifi debugging
- and read the ip/port of the phone.
- Then connect over usb and type (replace ip/port as required)
- 
- >adb pair 192.168.2.22:39963
- 
- Remove usb and type
- >adb connect 192.168.2.22:39963
- 
+
+The Android Studio UI (QR code) often triggers this protocol fault. Manual pairing via CLI is more stable: 
+
+- Enable Wireless debugging on your phone.
+- Tap "Pair device with pairing code." Note the IP address, Port, and 6-digit code.
+- In your computer terminal, type:  `adb pair <IP_ADDRESS>:<PORT>`
+- Enter the 6-digit code when prompted.
+- Once successful, use the other IP/Port (shown on the main Wireless Debugging screen) to connect: `adb connect <IP_ADDRESS>:<PORT>`
+
  Now it should be connected.
+ 
+ 
