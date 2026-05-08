@@ -31,12 +31,12 @@ android {
             minifyEnabled true
         }
     }
-    namespace 'no.jkvatne.android.motimeekthandler'
+    namespace = 'no.jkvatne.android.motimeekthandler'
     buildFeatures {
-        buildConfig true
+        buildConfig = true
     }
-    buildToolsVersion '36.0.0'
-    ndkVersion '25.2.9519653'
+    buildToolsVersion = '36.0.0'
+    ndkVersion = '25.2.9519653'
 
     packaging {
         resources {
