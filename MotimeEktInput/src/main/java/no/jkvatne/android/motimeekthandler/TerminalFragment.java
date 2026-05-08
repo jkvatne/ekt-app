@@ -108,6 +108,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     usbPermission = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED,
                             false)
                             ? UsbPermission.Granted : UsbPermission.Denied;
+                    Log.i("ECB", "broadcastReceiver onReceive: Connecting to USB");
                     connect();
                 }
             }
@@ -154,6 +155,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onDestroy() {
+        Log.i("ECB", "TerminalFragment.onDestroy()");
         if (connected != Connected.False)
             disconnect();
         requireActivity().stopService(new Intent(getActivity(), SerialService.class));
@@ -163,6 +165,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onStart() {
+        Log.i("ECB", "TerminalFragment.onStart()");
         super.onStart();
         if (service != null)
             service.attach(this);
@@ -173,9 +176,11 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onStop() {
+        Log.i("ECB", "TerminalFragment.onStop()");
         requireActivity().unregisterReceiver(broadcastReceiver);
-        if (service != null && !requireActivity().isChangingConfigurations())
-            service.detach();
+        if (service != null && !requireActivity().isChangingConfigurations()) {
+            // service.detach();
+        }
         super.onStop();
     }
 
@@ -184,11 +189,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onAttach(@NonNull Activity activity) {
         super.onAttach(activity);
+        Log.i("ECB", "TerminalFragment.onAttach()");
         requireActivity().bindService(new Intent(getActivity(), SerialService.class), this, Context.BIND_AUTO_CREATE);
     }
 
     @Override
     public void onDetach() {
+        Log.i("ECB", "TerminalFragment.onDetach()");
         try {requireActivity().unbindService(this);} catch (Exception ignored) {}
         super.onDetach();
     }
@@ -196,29 +203,35 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onResume() {
         super.onResume();
+        Log.i("ECB", "TerminalFragment.onResume()");
         if(initialStart && service != null) {
             initialStart = false;
+            Log.i("ECB", "Connecting to USB");
             requireActivity().runOnUiThread(this::connect);
         }
     }
 
     @Override
     public void onPause() {
+        Log.i("ECB", "TerminalFragment.onPause()");
         super.onPause();
     }
 
     @Override
     public void onServiceConnected(ComponentName name, IBinder binder) {
+        Log.i("ECB", "TerminalFragment.onServiceConnected()");
         service = ((SerialService.SerialBinder) binder).getService();
         service.attach(this);
         if(initialStart && isResumed()) {
             initialStart = false;
+            Log.i("ECB", "Connecting to USB");
             requireActivity().runOnUiThread(this::connect);
         }
     }
 
     @Override
     public void onServiceDisconnected(ComponentName name) {
+        Log.i("ECB", "TerminalFragment.onServiceDisconnected()");
         service = null;
     }
 
@@ -272,7 +285,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
      * Serial + UI
      */
     public void connect() {
-        Log.i("ECB", "Connecting to USB");
         eScanOk = false;
         eScan2Ok = false;
         UsbDevice device = null;
@@ -329,9 +341,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             // usb connect is not asynchronous. connect-success and connect-error are returned immediately from socket.connect
             // for consistency to bluetooth/bluetooth-LE app use same SerialListener and SerialService classes
             onSerialConnect();
-            status("Connected ok");
-            receiveText.append("USB connection ok\n");
-            getStatus();
+            status(getString(R.string.connected_ok));
+            receiveText.append(getString(R.string.connected_ok));
+            handler.postDelayed(this::getStatus, 500);
         } catch (Exception e) {
             status(getString(R.string.connection_failed) + e.getMessage());
             disconnect();
@@ -339,6 +351,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void disconnect() {
+        Log.i("ECB", "disconnect()");
         eScanOk = false;
         eScan2Ok = false;
         connected = Connected.False;
@@ -370,6 +383,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void send(String str) {
+        Log.i("ECB", "send() '"+str+"'");
         str = str + "\r\n";
         if (connected != Connected.True) {
             Toast.makeText(getActivity(), getString(R.string.no_contact), Toast.LENGTH_LONG).show();
@@ -395,6 +409,15 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         adb.show();
     }
 
+    public void ShowWarning() {
+        Log.i("ECB", "ShowWarning()");
+        AlertDialog.Builder adb = new AlertDialog.Builder(requireActivity());
+            adb.setTitle(getString(R.string.connection_lost));
+            adb.setIcon(android.R.drawable.ic_dialog_alert);
+            adb.setPositiveButton(android.R.string.ok, (dialog, which) -> { });
+        adb.show();
+    }
+
     public void onSpool() {
         if (noWeb) {
             return;
@@ -403,14 +426,14 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         adb.setTitle(getString(R.string.do_download));
         adb.setIcon(android.R.drawable.ic_dialog_alert);
         adb.setPositiveButton(android.R.string.ok, (dialog, which) -> {
-            // Spool last race
-            SpoolPackage(prevNo);
-        });
+        // Spool last race
+        SpoolPackage(prevNo);
+    });
         adb.setNegativeButton(android.R.string.cancel, (dialog, which) -> {
-            // Do nothing
-        });
+        // Do nothing
+    });
         adb.show();
-    }
+}
 
     public void getStatus() {
         send("/ST");
@@ -446,7 +469,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         cBuf.skip(1);    // Get STX and ignore it
         id = cBuf.get();    // get first char
         if (id == 'I') {
-            //Log.i("ECB","Status message");
+            Log.i("ECB","Status message");
             while (!cBuf.isEmpty() && cBuf.peek(0) >= 0x20) {
                 byte ch = cBuf.peek(0);
                 String s = cBuf.getString();
@@ -884,6 +907,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
      */
     @Override
     public void onSerialConnect() {
+        Log.i("ECB", "onSerialConnect()");
         status((String) getText(R.string.usb_connected));
         ((Activity) requireContext()).getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         connected = Connected.True;
@@ -892,6 +916,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onSerialConnectError(Exception e) {
+        Log.i("ECB", "onSerialConnect()");
         status(getText(R.string.connection_failed) + e.getMessage());
         disconnect();
     }
@@ -917,10 +942,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onSerialIoError(Exception e) {
+        Log.e("ECB", "onSerialIoError()");
         status((String) getText(R.string.connection_lost));
+        ShowWarning();
         ((Activity) requireContext()).getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         disconnect();
     }
+
 // End SerialListener
 
 }

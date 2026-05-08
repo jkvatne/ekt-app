@@ -128,8 +128,7 @@ public class CircularBuffer {
     }
 
     public int getInt() {
-        int x = 0;
-        x = (int) get() & 0xFF;
+        int x = (int) get() & 0xFF;
         x = x | ((int) get() & 0xFF) << 8;
         x = x | ((int) get() & 0xFF) << 16;
         x = x | ((int) get() & 0xFF) << 24;

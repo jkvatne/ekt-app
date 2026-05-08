@@ -7,7 +7,7 @@ def apikeyProperties = new Properties()
 apikeyProperties.load(new FileInputStream(apikeyPropertiesFile))
 
 android {
-    compileSdkVersion 'android-36.1'
+    compileSdkVersion 'android-37'
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
@@ -16,7 +16,7 @@ android {
 
     defaultConfig {
         minSdkVersion 26
-        targetSdk 36
+        targetSdk 37
         vectorDrawables.useSupportLibrary = true
 
         missingDimensionStrategy 'device', 'anyDevice'
@@ -49,7 +49,7 @@ android {
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.1'
-    implementation 'androidx.databinding:databinding-compiler:9.2.1'
+    annotationProcessor 'androidx.databinding:databinding-compiler:9.2.1'
     implementation 'com.google.android.material:material:1.13.0'
     implementation 'com.android.volley:volley:1.2.1'
     implementation 'androidx.core:core:1.18.0'

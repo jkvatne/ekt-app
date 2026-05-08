@@ -4,19 +4,19 @@
     <string name="app_name">Motime EKT tilkobling</string>
     <string name="devices">USB Devices</string>
     <string name="no_driver"><![CDATA[<no driver>]]></string>
-    <string name="server_ok">Web server OK</string>
+    <string name="server_ok">Internet tilkobling OK</string>
     <string name="url_error">Appens URL er feil!\n(Sjekk apikey.properties)\n</string>
     <string name="unsupported_parameters">Unsupported parameters</string>
     <string name="usb_connected">USB tilkoblet</string>
     <string name="connection_failed">USB forbindelse feilet</string>
     <string name="connection_failed2">USB forbindelse feilet eSCAN</string>
     <string name="perm_missing">Har ikke tillatelse til å koble til USB</string>
-    <string name="connection_lost">USB connection lost, please reconnect</string>
+    <string name="connection_lost">USB forbindelse avbrutt. Skru på avleser og sett inn kontakt på nytt</string>
     <string name="do_download">"Vil du laste ned de siste avlesningene?</string>
     <string name="do_clear">"Vil du slette alle avlesninger i eScan?</string>
     <string name="download">"Last ned dagens løp"</string>
     <string name="status">"Status"</string>
-    <string name="escan_sts">"Ok %s %s, Bat:%s%%, %s"</string>
+    <string name="escan_sts">"OK %s %s, Bat:%s%%, %s"</string>
     <string name="no_contact">"Ikke kontakt med avleser. Ta ut og plugg inn på nytt"</string>
     <string name="update_mtr_clock">"Oppdaterer MTR klokke\n"</string>
     <string name="mtr_clock_ok">"MTR klokke OK\n\n"</string>
@@ -32,6 +32,7 @@
     <string name="last_count">"Siste løp har %d brikker\n"</string>
     <string name="badge_message">"Badge message tag=%d from=%d rno=%d"</string>
     <string name="insert_cable">"Sett inn USB kabel"</string>
+    <string name="connected_ok">"Venter på status...\n"</string>
     <!-- BLE -->
     <string name="ble_not_supported">Bluetooth LE is not supported on this phone</string>
     <string name="turning_ble_on">Trying to turn on Bluetooth</string>

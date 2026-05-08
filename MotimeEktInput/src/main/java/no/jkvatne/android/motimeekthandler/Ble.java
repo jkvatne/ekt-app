@@ -70,7 +70,6 @@ public class Ble {
 
     //Special UUID for descriptor needed to enable notifications (?)
     private static final String NOTIFICATION_CONFIG = "f0007571-0451-4000-b000-000000000000";
-    private BluetoothGattCharacteristic escanWriteChar;
     private BluetoothGattCharacteristic escanNotifyChar;
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothGatt mBluetoothGatt = null;
@@ -118,11 +117,13 @@ public class Ble {
     }
 
     public void bleClose() {
-        if (mBluetoothGatt!=null) {
-            mBluetoothGatt.disconnect();
-        }
-        if (mBluetoothGatt!=null) {
-            mBluetoothGatt.close();
+        if (ActivityCompat.checkSelfPermission(null, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            if (mBluetoothGatt != null) {
+                mBluetoothGatt.disconnect();
+            }
+            if (mBluetoothGatt != null) {
+                mBluetoothGatt.close();
+            }
         }
         ble=null;
         Log.w(TAG,"bleClose() - setting mBluetoothGatt=null");
@@ -154,9 +155,11 @@ public class Ble {
             Log.d(TAG, "Bluetooth not supported,  bluetoothManager.getAdapter() failed");
         } else {
             if (!mBluetoothAdapter.isEnabled()) {
-                bleState = BleState.TURNING_BLE_ON;
-                Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-                mActivity.startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+                if (ActivityCompat.checkSelfPermission(null, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    bleState = BleState.TURNING_BLE_ON;
+                    Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                    mActivity.startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+                }
             }
         }
     }
@@ -200,9 +203,9 @@ public class Ble {
                     uuid = gattCharacteristic.getUuid().toString();
                     Log.d(TAG, "Found KeySafe characteristic "+uuid);
                     if (uuid.equalsIgnoreCase(ESCAN_CHAR_WRITE)) {
-                        // Found the KeySafe command1 characteristic.
+                        // Found command1 characteristic.
                         bleState = BleState.CONNECTING;
-                        escanWriteChar = gattCharacteristic;
+                        //escanWriteChar = gattCharacteristic;
                     }
                     if (uuid.equalsIgnoreCase(ESCAN_CHAR_NOTIFY)) {
                         bleState = BleState.CONNECTING;
@@ -268,9 +271,11 @@ public class Ble {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                Log.i(TAG, "Connected to GATT server.");
-                bleState = BleState.CONNECTING;
-                mBluetoothGatt.discoverServices();
+                if (ActivityCompat.checkSelfPermission(null, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    Log.i(TAG, "Connected to GATT server.");
+                    bleState = BleState.CONNECTING;
+                    mBluetoothGatt.discoverServices();
+                }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 bleState = BleState.DISCONNECTED;
                 bleClose();
@@ -311,7 +316,7 @@ public class Ble {
         // This is the callback when new data arrives
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             Log.d(TAG, "onCharacteristicChanged callback");
-            if (characteristic.getUuid().toString() == ESCAN_CHAR_NOTIFY) {
+            if (characteristic.getUuid().toString().equals(ESCAN_CHAR_NOTIFY)) {
                 String data = characteristic.getStringValue(0);
                 ble.handleRxData(data);
                 Log.d(TAG, "========= Got escan data " + data);
@@ -343,6 +348,7 @@ public class Ble {
 
         @Override
         public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status) {
+            Log.d(TAG, "onReadRemoteRssi callback ");
         }
 
     };

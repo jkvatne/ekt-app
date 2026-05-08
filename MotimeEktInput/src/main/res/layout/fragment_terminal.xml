@@ -32,7 +32,7 @@
         android:id="@+id/statusTextView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@status"
+        android:text="@+string/status"
         android:textSize="9pt" />
 
     <View
@@ -61,7 +61,7 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@color/colorSendText"
-            android:contentDescription="@text/status"
+            android:contentDescription="@string/status"
             android:tooltipText="Query status"
             app:srcCompat="@drawable/baseline_check_24" />
 
@@ -71,7 +71,7 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@color/colorPrimaryDark"
-            android:contentDescription="@text/status"
+            android:contentDescription="@string/status"
             android:tooltipText="Clear all saved data"
             app:srcCompat="@drawable/ic_clear_white_24dp" />
     </LinearLayout>

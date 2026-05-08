@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.WindowManager;
 import java.util.Objects;
 import androidx.fragment.app.FragmentManager;
@@ -11,12 +12,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
 public class MainActivity extends AppCompatActivity implements FragmentManager.OnBackStackChangedListener {
-
-    private BluetoothAdapter mBluetoothAdapter;
-    // private BleDevices.BleListAdapter mBleListAdapter;
-    private boolean mScanning;
-    private BluetoothLeScanner bleScanner;
-    private Ble ble;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,6 +64,7 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
             TerminalFragment terminal = (TerminalFragment)getSupportFragmentManager().findFragmentByTag("terminal");
             if (terminal != null) {
                 terminal.status("USB device detected");
+                Log.i("ECB", "onNewIntent: Connecting to USB");
                 terminal.connect();
             }
         }
