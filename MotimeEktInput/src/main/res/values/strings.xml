@@ -28,7 +28,7 @@
     <string name="date_is_updated">"Dato er nå oppdatert\n"</string>
     <string name="unknown_package">"Ukjent pakke med %d tegn\n"</string>
     <string name="wrong_protocol">"Wrong protocol on eScan. Please change to Normal\n"</string>
-    <string name="empty_message">"Empty message from ekt reader, ektno=%d\n"</string>
+    <string name="empty_message">"Empty message - no controls, tag=%d from=%d rno=%d\n"</string>
     <string name="last_count">"Siste løp har %d brikker\n"</string>
     <string name="badge_message">"Badge message tag=%d from=%d rno=%d"</string>
     <string name="insert_cable">"Sett inn USB kabel"</string>

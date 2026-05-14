@@ -497,7 +497,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             int no = 0;
             byte[] buf = new byte[256];
             Log.i("ECB","Badge message");
-            while (!cBuf.isEmpty() && cBuf.last() != 0x03 && cBuf.last() != 0x00) {
+            while (!cBuf.isEmpty() && cBuf.last() != 0x03 && cBuf.last() != 0x00 && cBuf.last()!=0x02) {
                 byte b = cBuf.last();
                 if (b == 'N') {
                     // N  is the custom tag number, normally equal to the internal, permanent tag number
@@ -588,7 +588,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 receiveText.append(getString(R.string.wrong_protocol));
             }
             if (no == 0) {
-                receiveText.append(getString(R.string.empty_message, ektNo));
+                receiveText.append(getString(R.string.empty_message,  tagNo, eScanCtrlNo, recordNo));
+                Log.e("ECB",getString(R.string.empty_message, tagNo, eScanCtrlNo, recordNo));
             } else {
                 receiveText.append(String.format(Locale.ROOT, "%02d-%02d-%02d %02d:%02d:%02d ",
                         buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
@@ -596,7 +597,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 receiveText.append(String.format(Locale.ROOT, "Nr %d %d:%02d\n", ektNo,
                         totalTime / 60, totalTime % 60));
                 String url = ServerUrl + "a=" + String.valueOf(compressedData);
-                Log.e("ECB","Url="+url+"\n");
+                url = url.trim();
+                Log.i("ECB","Url="+url+"\n");
                 getUrlContent(url);
             }
         }
@@ -838,7 +840,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 url,
                 response -> {
                     try {
-                        Log.e("ECB","response="+response);
+                        Log.e("ECB","Got HTTP response, name="+ getTagValue(response, "name"));
                         receiveText.append("Klasse:" + getTagValue(response, "class") + " ");
                         int failed = Integer.parseInt(getTagValue(response, "failed"));
                         if (failed == 0) {

@@ -103,8 +103,10 @@ public class SerialService extends Service implements SerialListener {
 
     public void attach(SerialListener listener) {
         Log.i("ECB","attach SerialListener");
-        if(Looper.getMainLooper().getThread() != Thread.currentThread())
+        if(Looper.getMainLooper().getThread() != Thread.currentThread()) {
+            Log.e("ECB", "SerialListener: IllegalArgumentException, not in main thread.");
             throw new IllegalArgumentException("not in main thread");
+        }
         initNotification();
         cancelNotification();
         // use synchronized() to prevent new items in queue2
@@ -248,7 +250,7 @@ public class SerialService extends Service implements SerialListener {
                             first = lastRead.dataStrings.isEmpty(); // (1)
                             lastRead.add(data); // (3)
                         }
-                        if (first) {
+                        //if (first) {
                             mainLooper.post(() -> {
                                 ArrayDeque<byte[]> dataStrings;
                                 synchronized (lastRead) {
@@ -261,14 +263,14 @@ public class SerialService extends Service implements SerialListener {
                                     queue1.add(new QueueItem(QueueType.Read, dataStrings));
                                 }
                             });
-                        }
+                        //}
                     } else {
                         if (queue2.isEmpty() || queue2.getLast().type != QueueType.Read)
                             queue2.add(new QueueItem(QueueType.Read));
                         queue2.getLast().add(data);
                     }
                 } catch (Exception e) {
-                    Log.e(SerialSocket.class.getSimpleName(), getString(R.string.connection_failed) + e.getMessage());
+                    Log.e("ECB", getString(R.string.connection_failed) + e.getMessage());
                 }
             }
         } else {

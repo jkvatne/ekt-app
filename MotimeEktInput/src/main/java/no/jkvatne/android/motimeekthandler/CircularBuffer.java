@@ -147,7 +147,8 @@ public class CircularBuffer {
     // The string ends when a control character (<32) is reached. (normally TAB).
     // A terminating TAB is skipped
     public String getString() {
-        if (peek(0)==0x09) skip(1);
+        // Skip leading TAB
+        found((byte)9);
         StringBuilder s = new StringBuilder();
         while (peek(0) >= 0x20) {
             s.append((char) get());
