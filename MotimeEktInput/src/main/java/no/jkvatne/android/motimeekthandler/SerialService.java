@@ -101,7 +101,7 @@ public class SerialService extends Service implements SerialListener {
         socket.write(data);
     }
 
-    public void attach(SerialListener listener) {
+    void attach(SerialListener listener) {
         Log.i("ECB","attach SerialListener");
         if(Looper.getMainLooper().getThread() != Thread.currentThread()) {
             Log.e("ECB", "SerialListener: IllegalArgumentException, not in main thread.");
@@ -151,10 +151,10 @@ public class SerialService extends Service implements SerialListener {
         nm.createNotificationChannel(nc);
     }
 
-    public boolean areNotificationsEnabled() {
+    public boolean notificationsNotEnabled() {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         NotificationChannel nc = nm.getNotificationChannel(Constants.NOTIFICATION_CHANNEL);
-        return nm.areNotificationsEnabled() && nc != null && nc.getImportance() > NotificationManager.IMPORTANCE_NONE;
+        return !(nm.areNotificationsEnabled() && nc != null && nc.getImportance() > NotificationManager.IMPORTANCE_NONE);
     }
 
     private void createNotification() {
@@ -245,25 +245,21 @@ public class SerialService extends Service implements SerialListener {
             synchronized (this) {
                 try {
                     if (listener != null) {
-                        boolean first;
                         synchronized (lastRead) {
-                            first = lastRead.dataStrings.isEmpty(); // (1)
                             lastRead.add(data); // (3)
                         }
-                        //if (first) {
-                            mainLooper.post(() -> {
-                                ArrayDeque<byte[]> dataStrings;
-                                synchronized (lastRead) {
-                                    dataStrings = lastRead.dataStrings;
-                                    lastRead.init(); // (2)
-                                }
-                                if (listener != null) {
-                                    listener.onSerialRead(dataStrings);
-                                } else {
-                                    queue1.add(new QueueItem(QueueType.Read, dataStrings));
-                                }
-                            });
-                        //}
+                        mainLooper.post(() -> {
+                            ArrayDeque<byte[]> dataStrings;
+                            synchronized (lastRead) {
+                                dataStrings = lastRead.dataStrings;
+                                lastRead.init(); // (2)
+                            }
+                            if (listener != null) {
+                                listener.onSerialRead(dataStrings);
+                            } else {
+                                queue1.add(new QueueItem(QueueType.Read, dataStrings));
+                            }
+                        });
                     } else {
                         if (queue2.isEmpty() || queue2.getLast().type != QueueType.Read)
                             queue2.add(new QueueItem(QueueType.Read));

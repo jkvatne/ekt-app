@@ -127,13 +127,6 @@ public class CircularBuffer {
         }
     }
 
-    public int getInt() {
-        int x = (int) get() & 0xFF;
-        x = x | ((int) get() & 0xFF) << 8;
-        x = x | ((int) get() & 0xFF) << 16;
-        x = x | ((int) get() & 0xFF) << 24;
-        return x;
-    }
 
     public boolean found(byte b) {
         if (last() == b) {

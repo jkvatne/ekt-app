@@ -129,6 +129,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         } else {
             baudRate = 9600;
         }
+        Log.i("ECB","onCreate, portNum="+portNum+" deviceName="+deviceName);
         queue = Volley.newRequestQueue(this.requireActivity());
         cBuf = new CircularBuffer(20480);
         byte[] buf = BuildConfig.SERVER_URL.getBytes();
@@ -179,7 +180,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         Log.i("ECB", "TerminalFragment.onStop()");
         requireActivity().unregisterReceiver(broadcastReceiver);
         if (service != null && !requireActivity().isChangingConfigurations()) {
-            // service.detach();
+            service.detach();
         }
         super.onStop();
     }
@@ -241,6 +242,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
+        Log.i("ECB", "TerminalFragment.onCreateView()");
         View view = inflater.inflate(R.layout.fragment_terminal, container, false);
         receiveText = view.findViewById(R.id.receive_text);
         statusText = view.findViewById(R.id.statusTextView);
@@ -261,7 +263,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         stsBtn.setOnClickListener(v -> getStatus());
         View clearBtn = view.findViewById(R.id.clear_btn);
         clearBtn.setOnClickListener(v -> onClear());
-
         return view;
     }
 
@@ -274,6 +275,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
         if (id == R.id.clear) {
+            Log.i("ECB", "TerminalFragment option clear");
             receiveText.setText("");
             cBuf.clear();
             return true;
@@ -293,21 +295,22 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             device = v;
         }
         if (device == null) {
+            Log.e("ECB", "TerminalFragment.connect() failed");
             status(getString(R.string.connection_failed));
             return;
         }
+        Log.i("ECB", "TerminalFragment.connect()");
         UsbSerialDriver driver = UsbSerialProber.getDefaultProber().probeDevice(device);
         if (driver == null) {
             driver = CustomProber.getCustomProber().probeDevice(device);
         }
         if (driver.getPorts().size() < portNum) {
-            //status("connection failed: not enough ports at device");
+            Log.e("ECB", "TerminalFragment.connect() failed, not enouth ports");
             status(getString(R.string.connection_failed));
             return;
         }
         usbSerialPort = driver.getPorts().get(portNum);
         UsbDeviceConnection usbConnection = usbManager.openDevice(driver.getDevice());
-        // if (usbConnection == null && permissionGranted == null && !usbManager.hasPermission(driver.getDevice())) {
         if (usbConnection == null && usbPermission == UsbPermission.Unknown && !usbManager.hasPermission(driver.getDevice())) {
             usbPermission = UsbPermission.Requested;
             PendingIntent usbPermissionIntent = PendingIntent.getBroadcast(getActivity(), 0,
@@ -315,16 +318,17 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             usbManager.requestPermission(driver.getDevice(), usbPermissionIntent);
             return;
         }
-        //if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        if (!service.areNotificationsEnabled() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (service.notificationsNotEnabled() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 0);
         }
-        //}
         if (usbConnection == null) {
-            if (!usbManager.hasPermission(driver.getDevice()))
+            if (!usbManager.hasPermission(driver.getDevice())) {
+                Log.e("ECB", "TerminalFragment, no permission for USB");
                 status(getString(R.string.perm_missing));
-            else
+            }  else {
+                Log.e("ECB", "TerminalFragment.connect() failed usb");
                 status(getString(R.string.connection_failed));
+            }
             return;
         }
 
@@ -343,15 +347,16 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             onSerialConnect();
             status(getString(R.string.connected_ok));
             receiveText.append(getString(R.string.connected_ok));
-            handler.postDelayed(this::getStatus, 500);
+            handler.postDelayed(this::getStatus, 100);
         } catch (Exception e) {
             status(getString(R.string.connection_failed) + e.getMessage());
+            Log.e("ECB", "TerminalFragment.connect() failed open");
             disconnect();
         }
     }
 
     private void disconnect() {
-        Log.i("ECB", "disconnect()");
+        Log.i("ECB", "TerminalFragment.disconnect()");
         eScanOk = false;
         eScan2Ok = false;
         connected = Connected.False;
@@ -372,6 +377,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private void SendBytes(byte[] data) {
         if (connected != Connected.True) {
+            Log.e("ECB", "TerminalFragment.SendBytes() not connected");
             Toast.makeText(getActivity(), "not connected", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -383,16 +389,18 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void send(String str) {
-        Log.i("ECB", "send() '"+str+"'");
         str = str + "\r\n";
         if (connected != Connected.True) {
+            Log.e("ECB", "send() not connected");
             Toast.makeText(getActivity(), getString(R.string.no_contact), Toast.LENGTH_LONG).show();
             return;
         }
         try {
+            Log.i("ECB", "send() '"+str+"'");
             byte[] data = (str).getBytes();
             service.write(data);
         } catch (Exception e) {
+            Log.e("ECB", "send() exception on service.write");
             status(e.getMessage());
         }
     }
@@ -420,6 +428,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     public void onSpool() {
         if (noWeb) {
+            Log.e("ECB", "onSpool() - no web connection");
             return;
         }
         AlertDialog.Builder adb = new AlertDialog.Builder(requireActivity());
@@ -427,21 +436,23 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         adb.setIcon(android.R.drawable.ic_dialog_alert);
         adb.setPositiveButton(android.R.string.ok, (dialog, which) -> {
         // Spool last race
+        Log.e("ECB", "onSpool()");
         SpoolPackage(prevNo);
-    });
+        });
         adb.setNegativeButton(android.R.string.cancel, (dialog, which) -> {
         // Do nothing
-    });
+        });
         adb.show();
-}
+    }
 
     public void getStatus() {
+        Log.i("ECB", "getStatus()");
         send("/ST");
     }
 
     private void receiveEcb(byte[] data) {
         int messLen;
-        int ektNo = 0;
+        int ektNo;
         int tagNo=0;
         int eScanCtrlNo = 0;
         int recordNo = 0;
@@ -663,7 +674,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void receive(ArrayDeque<byte[]> dataStrings) {
-        //Log.i("ECB","Called receive()");
         lastMessageMs = android.os.SystemClock.elapsedRealtime();
         for (byte[] data : dataStrings) {
             if (eScanOk || eScan2Ok) {
@@ -840,7 +850,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 url,
                 response -> {
                     try {
-                        Log.e("ECB","Got HTTP response, name="+ getTagValue(response, "name"));
+                        Log.i("ECB","Got HTTP response, name="+ getTagValue(response, "name"));
                         receiveText.append("Klasse:" + getTagValue(response, "class") + " ");
                         int failed = Integer.parseInt(getTagValue(response, "failed"));
                         if (failed == 0) {
@@ -899,7 +909,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        if(Arrays.equals(permissions, new String[]{Manifest.permission.POST_NOTIFICATIONS}) && !service.areNotificationsEnabled()) {
+        if(Arrays.equals(permissions, new String[]{Manifest.permission.POST_NOTIFICATIONS}) && service.notificationsNotEnabled()) {
             showNotificationSettings();
         }
     }
