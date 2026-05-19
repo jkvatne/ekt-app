@@ -178,10 +178,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onStop() {
         Log.i("ECB", "TerminalFragment.onStop()");
-        requireActivity().unregisterReceiver(broadcastReceiver);
-        if (service != null && !requireActivity().isChangingConfigurations()) {
-            service.detach();
-        }
+        //requireActivity().unregisterReceiver(broadcastReceiver);
+        //if (service != null && !requireActivity().isChangingConfigurations()) {
+        //    service.detach();
+        //}
         super.onStop();
     }
 
@@ -546,7 +546,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 } else if (b == 'W') {
                     cBuf.skip(1);
                     // Time when badge was read
-                    buf[8] = (byte) (year - 2000);
+                    buf[8] = (byte) (year - 1900);
                     buf[9] = (byte) month;
                     buf[10] = (byte) day;
                     buf[11] = (byte) cBuf.parseInt();  // hr
@@ -611,6 +611,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 url = url.trim();
                 Log.i("ECB","Url="+url+"\n");
                 getUrlContent(url);
+                getStatus();
             }
         }
     }
@@ -778,7 +779,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         int bv = 63;
         compressedData[pos++] = b64(bv);
         // Measured time, 5 char, year modulo 16, |YYYYMM|MMDDDD|DHHHHH|MMMMMM|SSSSSS
-        // Year is years after 1900 mod 16, so 2022 is 10 (0xA). Add 2012
+        // WRONG: Year is years after 1900 mod 16, so 2022 is 10 (0xA). Add 2012
+        // buf[8] bits 2..7 is year mod 16, so 2026 is 10. Add 2016.
         // Month is 0-11
         compressedData[pos++] =
                 b64((((bb(badge_buffer, 8) + 1900) & 0x0F) << 2) + ((bb(badge_buffer, 9) >> 2) & 3));
