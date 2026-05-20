@@ -347,7 +347,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             onSerialConnect();
             status(getString(R.string.connected_ok));
             receiveText.append(getString(R.string.connected_ok));
-            handler.postDelayed(this::getStatus, 100);
+            handler.postDelayed(this::getStatus, 200);
         } catch (Exception e) {
             status(getString(R.string.connection_failed) + e.getMessage());
             Log.e("ECB", "TerminalFragment.connect() failed open");
@@ -382,7 +382,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             return;
         }
         try {
+            Log.i("ECB", "SendBytes");
             usbSerialPort.write(data, WRITE_WAIT_MILLIS);
+            Log.i("ECB", "SendBytes done");
         } catch (Exception e) {
             status(e.getMessage());
         }
@@ -396,7 +398,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             return;
         }
         try {
-            Log.i("ECB", "send() '"+str+"'");
+            Log.i("ECB", "send() '"+str.trim()+"'");
             byte[] data = (str).getBytes();
             service.write(data);
         } catch (Exception e) {
@@ -435,18 +437,17 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         adb.setTitle(getString(R.string.do_download));
         adb.setIcon(android.R.drawable.ic_dialog_alert);
         adb.setPositiveButton(android.R.string.ok, (dialog, which) -> {
-        // Spool last race
-        Log.e("ECB", "onSpool()");
-        SpoolPackage(prevNo);
+            // Spool last race
+            SpoolPackage(prevNo);
         });
         adb.setNegativeButton(android.R.string.cancel, (dialog, which) -> {
-        // Do nothing
+           // Do nothing
         });
         adb.show();
     }
 
     public void getStatus() {
-        Log.i("ECB", "getStatus()");
+        // Log.i("ECB", "getStatus()");
         send("/ST");
     }
 
@@ -503,12 +504,28 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 statusText.setText(getString(R.string.escan_sts,
                         ecbDate, ecbTime.substring(0,ecbTime.length()-4), batterySts, messNo));
             }
-        } else {
+        } else if (id == '/') {
+            while (true) {
+                byte b = cBuf.get();
+                if (b==10 || b==0) {
+                    break;
+                }
+            }
+
+        } else if (id == 'N') {
             int tStart = 0;
+            int n = 0;
             int no = 0;
             byte[] buf = new byte[256];
             Log.i("ECB","Badge message");
+            int start = cBuf.nextGet;
             while (!cBuf.isEmpty() && cBuf.last() != 0x03 && cBuf.last() != 0x00 && cBuf.last()!=0x02) {
+                n++;
+                if (n>260) {
+                    Log.e("ECB", "Hanging in receiveEcb()");
+                    cBuf.clear();
+                    break;
+                }
                 byte b = cBuf.last();
                 if (b == 'N') {
                     // N  is the custom tag number, normally equal to the internal, permanent tag number
@@ -517,6 +534,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     buf[20] = (byte) (ektNo & 0xFF);
                     buf[21] = (byte) ((ektNo >> 8) & 0xFF);
                     buf[22] = (byte) ((ektNo >> 16) & 0xFF);
+                } else if (b == '/') {
+                    while (b!=10 && b!=0) {
+                        b = cBuf.last();
+                    }
                 } else if (b == 'M') {
                     // M is Tag passing number (eScan record number, starting at 0 for a new race)
                     cBuf.skip(1);
@@ -602,16 +623,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 receiveText.append(getString(R.string.empty_message,  tagNo, eScanCtrlNo, recordNo));
                 Log.e("ECB",getString(R.string.empty_message, tagNo, eScanCtrlNo, recordNo));
             } else {
-                receiveText.append(String.format(Locale.ROOT, "%02d-%02d-%02d %02d:%02d:%02d ",
-                        buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
                 ektNo = ((int) buf[20] & 0xFF) + (((int) buf[21] & 0xFF) << 8) + (((int) buf[22] & 0xFF) << 16);
-                receiveText.append(String.format(Locale.ROOT, "Nr %d %d:%02d\n", ektNo,
-                        totalTime / 60, totalTime % 60));
+                receiveText.append(String.format(Locale.ROOT, "%02d:%02d:%02d: Tag %7d %3d:%02d\n",
+                        buf[11], buf[12], buf[13], ektNo, totalTime / 60, totalTime % 60));
                 String url = ServerUrl + "a=" + String.valueOf(compressedData);
                 url = url.trim();
                 Log.i("ECB","Url="+url+"\n");
                 getUrlContent(url);
-                getStatus();
             }
         }
     }
@@ -707,23 +725,26 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     // SpoolPackage will read all records starting at given number from the MTR3/4.
     void SpoolPackage(int no) {
         if (mtrOk) {
+            Log.i("ECB", "SpoolPackage mtr called");
             receiveText.append(getString(R.string.spool_from) + no + "\n");
             // Send /SBnnnn
             byte[] data = {0x2F, 0x53, 0x42, (byte) (no & 0xFF), (byte) ((no >> 8) & 0xFF),
                     (byte) ((no >> 16) & 0xFF), (byte) ((no >> 24) & 0xFF)};
             SendBytes(data);
         } else if (eScanOk) {
+            Log.i("ECB", "SpoolPackage eScan called");
             receiveText.append(getString(R.string.spool_all));
             //  Send Spool all = /QD<cr><lf>
             byte[] data = {0x2F, 0x51, 0x44, 0x0D, 0x0A};
             SendBytes(data);
         } else if (eScan2Ok) {
+            Log.i("ECB", "Spool all todays records from eScan2");
             receiveText.append(getString(R.string.spool_today));
             //  Send spool today /QM<cr><lf>
             byte[] data = {0x2F, 0x51, 0x4D, 0x0D, 0x0A};
             SendBytes(data);
         }
-
+        Log.i("ECB", "SpoolPackage done");
     }
 
     void ClearAll() {
