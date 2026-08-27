@@ -32,7 +32,8 @@
     <string name="last_count">"Siste løp har %d brikker\n"</string>
     <string name="badge_message">"Badge message tag=%d from=%d rno=%d"</string>
     <string name="insert_cable">"Sett inn USB kabel"</string>
-    <string name="connected_ok">"Venter på status…\n"</string>
+    <string name="connected_ok">"USB tilkobling ok\n"</string>
+    <string name="status_received">"eScan2 status mottatt\n"</string>
     <!-- BLE -->
     <string name="ble_not_supported">Bluetooth LE is not supported on this phone</string>
     <string name="turning_ble_on">Trying to turn on Bluetooth</string>

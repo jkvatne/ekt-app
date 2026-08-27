@@ -92,6 +92,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public boolean eScan2Ok = false;
     public boolean mtrOk = false;
     private  boolean initialStart = true;
+    private boolean statusOk;
     final Handler handler = new Handler();
     private long lastMessageMs;
 
@@ -148,6 +149,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                         lastMessageMs = 0;
                         status((String) getText(R.string.connection_lost));
                         disconnect();
+                        statusOk = false;
                     }
                 }
             }
@@ -501,6 +503,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 }
             }
             if (ecbTime.length()>4) {
+                if (!statusOk) {
+                    receiveText.append(getString(R.string.status_received));
+                }
+                statusOk = true;
                 statusText.setText(getString(R.string.escan_sts,
                         ecbDate, ecbTime.substring(0,ecbTime.length()-4), batterySts, messNo));
             }
@@ -619,7 +625,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             if (protocolType>0) {
                 receiveText.append(getString(R.string.wrong_protocol));
             }
-            if (no == 0) {
+            if (n == 0) {
                 receiveText.append(getString(R.string.empty_message,  tagNo, eScanCtrlNo, recordNo));
                 Log.e("ECB",getString(R.string.empty_message, tagNo, eScanCtrlNo, recordNo));
             } else {
