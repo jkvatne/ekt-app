@@ -96,6 +96,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     final Handler handler = new Handler();
     private long lastMessageMs;
 
+    public AlertDialog myAlertDialog = null;
     public static void HandleBleString(String s) {
         // TODO: Handle BLE messages here
         Log.i("BLE", "Got BLE message: "+s);
@@ -154,6 +155,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 }
             }
         }, delay);
+
     }
 
     @Override
@@ -175,6 +177,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         else
             requireActivity().startService(new Intent(getActivity(), SerialService.class)); // prevents service destroy on unbind from recreated activity caused by orientation change
         ContextCompat.registerReceiver(requireActivity(), broadcastReceiver, new IntentFilter(Constants.INTENT_ACTION_GRANT_USB), ContextCompat.RECEIVER_NOT_EXPORTED);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireActivity());
+        // myAlertDialog = new AlertDialog(requireActivity());
+        builder.setTitle(getString(R.string.connection_lost));
+        builder.setIcon(android.R.drawable.ic_dialog_alert);
+        builder.setPositiveButton(android.R.string.ok, (dialog, which) -> { });
+        myAlertDialog = builder.create();
     }
 
     @Override
@@ -423,11 +432,14 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     public void ShowWarning() {
         Log.i("ECB", "ShowWarning()");
+        /*
         AlertDialog.Builder adb = new AlertDialog.Builder(requireActivity());
             adb.setTitle(getString(R.string.connection_lost));
             adb.setIcon(android.R.drawable.ic_dialog_alert);
             adb.setPositiveButton(android.R.string.ok, (dialog, which) -> { });
         adb.show();
+         */
+        myAlertDialog.show();
     }
 
     public void onSpool() {
@@ -505,6 +517,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             if (ecbTime.length()>4) {
                 if (!statusOk) {
                     receiveText.append(getString(R.string.status_received));
+                    myAlertDialog.dismiss();
                 }
                 statusOk = true;
                 statusText.setText(getString(R.string.escan_sts,

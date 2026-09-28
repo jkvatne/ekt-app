@@ -40,7 +40,8 @@
         </activity>
         <service
             android:name=".SerialService"
-            android:foregroundServiceType="remoteMessaging|connectedDevice" />
+            android:foregroundServiceType="remoteMessaging|connectedDevice"
+            android:exported="false"/>
     </application>
 
 </manifest>

@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="MotimeEktInput">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-05-05T13:56:16.466184400Z">
+        <DropdownSelection timestamp="2026-09-28T09:17:50.353794400Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\jkvat\.android\avd\Pixel_6a.avd" />
+              <DeviceId pluginId="PhysicalDevice" identifier="serial=29011JEGR21879" />
             </handle>
           </Target>
         </DropdownSelection>

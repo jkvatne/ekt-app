@@ -29,6 +29,7 @@ android {
     buildTypes {
         release {
             minifyEnabled true
+            shrinkResources true
         }
     }
     namespace = 'no.jkvatne.android.motimeekthandler'
@@ -48,10 +49,10 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.7.1'
-    annotationProcessor 'androidx.databinding:databinding-compiler:9.2.1'
-    implementation 'com.google.android.material:material:1.13.0'
+    implementation 'androidx.appcompat:appcompat:1.8.0'
+    annotationProcessor 'androidx.databinding:databinding-compiler:9.4.1'
+    implementation 'com.google.android.material:material:1.14.0'
     implementation 'com.android.volley:volley:1.2.1'
-    implementation 'androidx.core:core:1.18.0'
+    implementation 'androidx.core:core:1.19.1'
     implementation 'com.github.mik3y:usb-serial-for-android:3.10.0'
 }
