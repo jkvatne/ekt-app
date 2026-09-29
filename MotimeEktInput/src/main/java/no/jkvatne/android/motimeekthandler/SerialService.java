@@ -163,7 +163,7 @@ public class SerialService extends Service implements SerialListener {
             throw new IllegalArgumentException("not in main thread");
         }
         initNotification();
-        cancelNotification();
+        // cancelNotification();
         // use synchronized() to prevent new items in queue2
         // new items will not be added to queue1 because mainLooper.post and attach() run in main thread
         synchronized (this) {
@@ -177,18 +177,10 @@ public class SerialService extends Service implements SerialListener {
                 case IoError:       listener.onSerialIoError      (item.e); break;
             }
         }
-        for(QueueItem item : queue2) {
-            switch(item.type) {
-                case Connect:       listener.onSerialConnect      (); break;
-                case ConnectError:  listener.onSerialConnectError (item.e); break;
-                case Read:          listener.onSerialRead         (item.dataStrings); break;
-                case IoError:       listener.onSerialIoError      (item.e); break;
-            }
-        }
         queue1.clear();
-        queue2.clear();
-        if(connected)
+        if(connected) {
             createNotification();
+        }
 
     }
 
@@ -260,7 +252,7 @@ public class SerialService extends Service implements SerialListener {
                         }
                     });
                 } else {
-                    queue2.add(new QueueItem(QueueType.Connect));
+                    Log.e("ECB", "No listener");
                 }
             }
         }
@@ -280,8 +272,7 @@ public class SerialService extends Service implements SerialListener {
                         }
                     });
                 } else {
-                    queue2.add(new QueueItem(QueueType.ConnectError, e));
-                    disconnect();
+                    Log.e("ECB", "onSerialConnectError: No listener");
                 }
             }
         }
@@ -318,9 +309,7 @@ public class SerialService extends Service implements SerialListener {
                             }
                         });
                     } else {
-                        if (queue2.isEmpty() || queue2.getLast().type != QueueType.Read)
-                            queue2.add(new QueueItem(QueueType.Read));
-                        queue2.getLast().add(data);
+                        Log.e("ECB", "onSerialRead: No listener");
                     }
                 } catch (Exception e) {
                     Log.e("ECB", getString(R.string.connection_failed) + e.getMessage());
@@ -345,8 +334,7 @@ public class SerialService extends Service implements SerialListener {
                         }
                     });
                 } else {
-                    queue2.add(new QueueItem(QueueType.IoError, e));
-                    disconnect();
+                    Log.e("ECB", "onSerialIoError: No listener");
                 }
             }
         }

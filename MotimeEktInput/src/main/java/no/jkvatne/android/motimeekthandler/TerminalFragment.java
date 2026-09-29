@@ -45,6 +45,9 @@ import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
 import com.hoho.android.usbserial.util.SerialInputOutputManager;
 
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -53,10 +56,12 @@ import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Locale;
 
+/*
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
+*/
 
 import static java.util.concurrent.TimeUnit.*;
 
@@ -82,7 +87,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private enum Connected {False, Pending, True}
 
     private Connected connected = Connected.False;
-    private RequestQueue queue;
     private int prevNo;
     private CircularBuffer cBuf;
     private String ServerUrl = "<loaded from apikey.properties by gradle>";
@@ -140,7 +144,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             baudRate = 9600;
         }
         Log.i("ECB","onCreate, portNum="+portNum+" deviceName="+deviceName);
-        queue = Volley.newRequestQueue(this.requireActivity());
+        // queue = Volley.newRequestQueue(this.requireActivity());
         cBuf = new CircularBuffer(20480);
         byte[] buf = BuildConfig.SERVER_URL.getBytes();
         ServerUrl = new String(buf, StandardCharsets.UTF_8);
@@ -904,6 +908,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     public void getUrlContent(String url) {
+        /*
         // Request a string response from the provided URL.
         StringRequest stringRequest = new StringRequest(
                 Request.Method.GET,
@@ -930,10 +935,36 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 error -> receiveText.append("Error in web response\n")
         );
         queue.add(stringRequest);
+         */
+        HttpURLConnection urlConnection = null;
+        try {
+            URL urlc = new URL(url);
+            urlConnection = (HttpURLConnection) urlc.openConnection();
+            urlConnection.setRequestMethod("GET");
+            urlConnection.setRequestProperty("Content-Type", "application/json; utf-8");
+            urlConnection.setDoOutput(true);
+            urlConnection.setConnectTimeout(3000);
+            urlConnection.setReadTimeout(3000);
+
+            int responseCode = urlConnection.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                Log.i("ECB","Got HTTP response, "+ responseCode);
+            } else {
+                Log.i("ECB", "Wrong response code: "+responseCode);
+            }
+        } catch (Exception e) {
+            Log.e("ECB", "Got exception in getUrlContent, ", e);
+        } finally {
+            if (urlConnection != null) {
+                urlConnection.disconnect();
+            }
+        }
+
     }
 
     public void verifyServer() {
         // Request a string response from the provided URL.
+        /* TODO
         StringRequest stringRequest = new StringRequest(
                 Request.Method.GET,
                 ServerUrl + "ack=1",
@@ -953,6 +984,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         year = d.getYear();
         month = d.getMonthValue();
         day = d.getDayOfMonth();
+        */
     }
 
     /*
