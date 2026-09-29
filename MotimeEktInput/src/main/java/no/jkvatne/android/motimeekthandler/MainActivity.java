@@ -1,9 +1,11 @@
 package no.jkvatne.android.motimeekthandler;
 
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.le.BluetoothLeScanner;
+import static androidx.core.content.ContextCompat.getSystemService;
+
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.PowerManager;
 import android.util.Log;
 import android.view.WindowManager;
 import java.util.Objects;
@@ -12,6 +14,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
 public class MainActivity extends AppCompatActivity implements FragmentManager.OnBackStackChangedListener {
+
+    private PowerManager.WakeLock wakeLock;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -25,26 +29,30 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
         else
             onBackStackChanged();
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        Log.i("ECB","MainActivity onCreate. Aquire wakeLock");
+        // Create the WakeLock
+        PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "EktInput::MyWakelockTag" );
+        wakeLock.acquire(10 * 60 * 1000L);  // 10 minutes
+    }
 
-        // Check that phone has BLE
-        /*
-        if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
-            Toast.makeText(this,
-                    R.string.ble_not_supported,
-                    Toast.LENGTH_SHORT).show();
-        } else {
-            final BluetoothManager bluetoothManager =
-                    (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-            mBluetoothAdapter = bluetoothManager.getAdapter();
-            if (mBluetoothAdapter == null) {
-                //Message that Bluetooth not supported
-                Toast.makeText(this, R.string.ble_not_supported, Toast.LENGTH_SHORT).show();
-            } else {
-                bleScanner = mBluetoothAdapter.getBluetoothLeScanner();
-            }
-            ble=Ble.getInstance(this);
-        }
-        */
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Log.i("ECB","MainActivity onResume");
+        /*if (wakeLock != null) {
+            wakeLock.acquire(120 * 60 * 1000L);  // 120 minutes
+        }*/
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Log.i("ECB","onPause: main activity");
+        // Release the WakeLock safely
+        //if (wakeLock != null && wakeLock.isHeld()) {
+        //    wakeLock.release();
+        //}
     }
 
     @Override

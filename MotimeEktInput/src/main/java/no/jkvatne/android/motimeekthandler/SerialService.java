@@ -8,6 +8,7 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -24,6 +25,13 @@ import java.util.ArrayDeque;
  * use listener chain: SerialSocket -> SerialService -> UI fragment
  */
 public class SerialService extends Service implements SerialListener {
+
+    private static final String TAG = "UsbBackgroundService";
+    private static final String CHANNEL_ID = "UsbServiceChannel";
+    private static final int NOTIFICATION_ID = 1;
+
+    private boolean isRunning = false;
+    private Thread readThread;
 
     class SerialBinder extends Binder {
         SerialService getService() { return SerialService.this; }
@@ -53,9 +61,54 @@ public class SerialService extends Service implements SerialListener {
     private SerialListener listener;
     private boolean connected;
 
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+
+        Log.i("ECB","onStartCommand: Start notification");
+
+        // 1. Instantly promote the service to Foreground to avoid OS death
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("USB Serial Monitor")
+                .setContentText("Reading data in background...")
+                .setSmallIcon(android.R.drawable.stat_notify_sync)
+                .build();
+
+        startForeground(NOTIFICATION_ID, notification);
+
+        // 2. Start your background thread logic if not running
+        if (!isRunning) {
+            isRunning = true;
+            // startUsbReading();
+        }
+
+        return START_STICKY; // Tells the OS to recreate the service if killed under memory pressure
+    }
+
+    private void createNotificationChannel() {
+        //if (Build.VERSION.SDK_INT >= 1) {
+            NotificationChannel serviceChannel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "USB Background Service Channel",
+                    NotificationManager.IMPORTANCE_LOW
+            );
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(serviceChannel);
+            }
+        //}
+    }
+
     /**
      * Lifecycle
      */
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        createNotificationChannel();
+    }
+
     public SerialService() {
         mainLooper = new Handler(Looper.getMainLooper());
         binder = new SerialBinder();
@@ -81,12 +134,14 @@ public class SerialService extends Service implements SerialListener {
      * Api
      */
     public void connect(SerialSocket socket) throws IOException {
+        Log.i("ECB", "SerialService connect");
         socket.connect(this);
         this.socket = socket;
         connected = true;
     }
 
     public void disconnect() {
+        Log.i("ECB", "SerialService disconnect");
         connected = false; // ignore data,errors while disconnecting
         cancelNotification();
         if(socket != null) {
@@ -132,16 +187,17 @@ public class SerialService extends Service implements SerialListener {
         }
         queue1.clear();
         queue2.clear();
+        if(connected)
+            createNotification();
+
     }
 
     public void detach() {
-        if(connected)
-            createNotification();
+        Log.i("ECB","detach SerialListener");
         // items already in event queue (posted before detach() to mainLooper) will end up in queue1
         // items occurring later, will be moved directly to queue2
         // detach() and mainLooper.post run in the main thread, so all items are caught
         listener = null;
-        Log.i("ECB","detach SerialListener");
     }
 
     private void initNotification() {
@@ -184,6 +240,7 @@ public class SerialService extends Service implements SerialListener {
     }
 
     private void cancelNotification() {
+        Log.i("ECB","cancelNotification for SerialService");
         stopForeground(true);
     }
 
@@ -240,8 +297,8 @@ public class SerialService extends Service implements SerialListener {
      * While not consumed (2), add more data (3).
      */
     public void onSerialRead(byte[] data) {
-        // Log.i("ECB","onSerialRead() "+data.length);
         if(connected) {
+            // Log.i("ECB","onSerialRead() "+data.length);
             synchronized (this) {
                 try {
                     if (listener != null) {

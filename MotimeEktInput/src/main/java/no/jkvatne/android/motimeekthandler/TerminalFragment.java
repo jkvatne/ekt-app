@@ -1,5 +1,8 @@
 package no.jkvatne.android.motimeekthandler;
 
+import static android.content.Context.POWER_SERVICE;
+import static androidx.core.content.ContextCompat.getSystemService;
+
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -13,10 +16,13 @@ import android.content.ServiceConnection;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -95,6 +101,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private boolean statusOk;
     final Handler handler = new Handler();
     private long lastMessageMs;
+    ToneGenerator toneGen = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
+    private PowerManager.WakeLock wakeLock;
 
     public AlertDialog myAlertDialog = null;
     public static void HandleBleString(String s) {
@@ -145,7 +153,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 handler.postDelayed(this, delay);
                 long elapsedMs = android.os.SystemClock.elapsedRealtime();
                 if (lastMessageMs!=0) {
-                    if (elapsedMs>(lastMessageMs+6000)) {
+                    if (elapsedMs>(lastMessageMs+600000)) {  // OBS SHould be 6000 for 6 sec timout
                         Log.e("ECB",">>>>>>>>>>>>> Timeout, no data <<<<<<<<<<<<<<<<");
                         lastMessageMs = 0;
                         status((String) getText(R.string.connection_lost));
@@ -156,6 +164,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             }
         }, delay);
 
+        // Create the WakeLock
+        Log.i("ECB","TerminalFragment onCreate. Aquire wakeLock");
+        /*
+        PowerManager powerManager = (PowerManager) getSystemService(getContext(), POWER_SERVICE);
+        PowerManager.WakeLock wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
+                "MyApp::SerialListenerWakeLock");
+         */
     }
 
     @Override
@@ -184,6 +199,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         builder.setIcon(android.R.drawable.ic_dialog_alert);
         builder.setPositiveButton(android.R.string.ok, (dialog, which) -> { });
         myAlertDialog = builder.create();
+        // wakeLock.acquire(10 * 60 * 1000L);  // 10 minutes
     }
 
     @Override
@@ -266,6 +282,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             noWeb = true;
         } else {
             noWeb = false;
+            try { MILLISECONDS.sleep(100);} catch (Exception ignored) {}
             verifyServer();
         }
         View spoolBtn = view.findViewById(R.id.spool_btn);
@@ -496,6 +513,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         id = cBuf.get();    // get first char
         if (id == 'I') {
             Log.i("ECB","Status message");
+            toneGen.startTone(ToneGenerator.TONE_CDMA_PIP,100);
             while (!cBuf.isEmpty() && cBuf.peek(0) >= 0x20) {
                 byte ch = cBuf.peek(0);
                 String s = cBuf.getString();
@@ -924,10 +942,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                         receiveText.append(getText(R.string.server_ok));
                         receiveText.append(" \n");
                     } catch (Exception e) {
-                        receiveText.append("Exception " + response);
+                        receiveText.append("Error checking for internet connection\n");   // "Exception " + response);
                     }
                 },
-                error -> receiveText.append("Error response " + error + "\n")
+                error -> receiveText.append("Internet error\n")  //+ error + "\n")
         );
         queue.add(stringRequest);
         // Update cached date
