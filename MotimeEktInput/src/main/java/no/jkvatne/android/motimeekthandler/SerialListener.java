@@ -8,4 +8,5 @@ interface SerialListener {
     void onSerialRead         (byte[] data);                // socket -> service
     void onSerialIoError      (Exception e);
     void onSerialProgress     (String s);
+    void onSerialStatus     (String s);
 }

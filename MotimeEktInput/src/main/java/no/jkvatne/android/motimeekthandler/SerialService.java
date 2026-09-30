@@ -26,6 +26,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayDeque;
+import java.util.Locale;
 
 /**
  * create notification and queue serial data while activity is not in the foreground
@@ -211,8 +212,6 @@ public class SerialService extends Service implements SerialListener {
         cBuf.skip(1);    // Get STX and ignore it
         id = cBuf.get();    // get first char
         if (id == 'I') {
-            Log.i("ECB","Status message");
-            onSerialProgress("Got status message\n");
             toneGen.startTone(ToneGenerator.TONE_CDMA_PIP,100);
             while (!cBuf.isEmpty() && cBuf.peek(0) >= 0x20) {
                 byte ch = cBuf.peek(0);
@@ -233,13 +232,8 @@ public class SerialService extends Service implements SerialListener {
                 }
             }
             if (ecbTime.length()>4) {
-                if (!statusOk) {
-                    // receiveText.append(getString(R.string.status_received));
-                    // myAlertDialog.dismiss();
-                }
                 statusOk = true;
-                // statusText.setText(getString(R.string.escan_sts,
-                //        ecbDate, ecbTime.substring(0,ecbTime.length()-4), batterySts, messNo));
+                onSerialStatus( getString(R.string.escan_sts, ecbTime.substring(0, ecbTime.length() - 4), batterySts, messNo));
             }
         } else if (id == '/') {
             while (true) {
@@ -353,20 +347,19 @@ public class SerialService extends Service implements SerialListener {
 
             char[] compressedData = new char[256];
             int totalTime = CompressTag(buf, compressedData);
-            /*
+
             if (protocolType>0) {
-                receiveText.append(getString(R.string.wrong_protocol));
+                onSerialProgress(getString(R.string.wrong_protocol));
             }
             if (n == 0) {
-                receiveText.append(getString(R.string.empty_message,  tagNo, eScanCtrlNo, recordNo));
+                onSerialProgress(getString(R.string.empty_message,  tagNo, eScanCtrlNo, recordNo));
                 Log.e("ECB",getString(R.string.empty_message, tagNo, eScanCtrlNo, recordNo));
             }
-            */
 
             if (n>0) {
-                // ektNo = ((int) buf[20] & 0xFF) + (((int) buf[21] & 0xFF) << 8) + (((int) buf[22] & 0xFF) << 16);
-                //receiveText.append(String.format(Locale.ROOT, "%02d:%02d:%02d: Tag %7d %3d:%02d\n",
-                //        buf[11], buf[12], buf[13], ektNo, totalTime / 60, totalTime % 60));
+                ektNo = ((int) buf[20] & 0xFF) + (((int) buf[21] & 0xFF) << 8) + (((int) buf[22] & 0xFF) << 16);
+                onSerialProgress(String.format(Locale.ROOT, "%02d:%02d:%02d: Tag %7d %3d:%02d\n",
+                        buf[11], buf[12], buf[13], ektNo, totalTime / 60, totalTime % 60));
                 String url = ServerUrl + "a=" + String.valueOf(compressedData);
                 url = url.trim();
                 Log.i("ECB","Url="+url+"\n");
@@ -742,4 +735,21 @@ public class SerialService extends Service implements SerialListener {
             }
         }
     }
+
+public void onSerialStatus(String s) {
+    Log.i("ECB","onSerialStatus "+s);
+    if(connected) {
+        synchronized (this) {
+            if (listener != null) {
+                mainLooper.post(() -> {
+                    if (listener != null) {
+                        listener.onSerialStatus(s);
+                    }
+                });
+            } else {
+                Log.e("ECB", "onSerialStatus: No listener");
+            }
+        }
+    }
+}
 }

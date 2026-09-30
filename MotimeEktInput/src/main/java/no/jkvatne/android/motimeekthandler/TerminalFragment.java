@@ -737,9 +737,18 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onSerialProgress(String s) {
         try {
-            receiveText.append(s);   // "Exception " + response);
+            receiveText.append(s);   // Works ok
         } catch (Exception e) {
             Log.e("ECB", "onSerialProgress() exception "+e);
+        }
+    }
+
+    @Override
+    public void onSerialStatus(String s) {
+        try {
+            status(s);
+        } catch (Exception e) {
+            Log.e("ECB", "onSerialStatus exception "+e);
         }
     }
 
