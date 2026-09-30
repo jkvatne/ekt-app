@@ -1,8 +1,5 @@
 package no.jkvatne.android.motimeekthandler;
 
-import static android.content.Context.POWER_SERVICE;
-import static androidx.core.content.ContextCompat.getSystemService;
-
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -45,23 +42,11 @@ import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
 import com.hoho.android.usbserial.util.SerialInputOutputManager;
 
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.Arrays;
-import java.util.Locale;
-
-/*
-import com.android.volley.Request;
-import com.android.volley.RequestQueue;
-import com.android.volley.toolbox.StringRequest;
-import com.android.volley.toolbox.Volley;
-*/
 
 import static java.util.concurrent.TimeUnit.*;
 
@@ -83,24 +68,12 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private SerialInputOutputManager usbIoManager;
     private UsbSerialPort usbSerialPort;
     private UsbPermission usbPermission = UsbPermission.Unknown;
-
     private enum Connected {False, Pending, True}
-
     private Connected connected = Connected.False;
     private int prevNo;
     private CircularBuffer cBuf;
     private String ServerUrl = "<loaded from apikey.properties by gradle>";
     private boolean noWeb = true;
-    private String batterySts = "";
-    private String ecbTime = "";
-    private String ecbDate = "";
-    private String messNo = "";
-    private int day;
-    private int month;
-    private int year;
-    public boolean eScanOk = false;
-    public boolean eScan2Ok = false;
-    public boolean mtrOk = false;
     private  boolean initialStart = true;
     private boolean statusOk;
     final Handler handler = new Handler();
@@ -144,7 +117,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             baudRate = 9600;
         }
         Log.i("ECB","onCreate, portNum="+portNum+" deviceName="+deviceName);
-        // queue = Volley.newRequestQueue(this.requireActivity());
         cBuf = new CircularBuffer(20480);
         byte[] buf = BuildConfig.SERVER_URL.getBytes();
         ServerUrl = new String(buf, StandardCharsets.UTF_8);
@@ -167,14 +139,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 }
             }
         }, delay);
-
-        // Create the WakeLock
-        /*
-        Log.i("ECB","TerminalFragment onCreate. Aquire wakeLock");
-        PowerManager powerManager = (PowerManager) getSystemService(getContext(), POWER_SERVICE);
-        PowerManager.WakeLock wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
-                "MyApp::SerialListenerWakeLock");
-         */
     }
 
     @Override
@@ -198,21 +162,15 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         ContextCompat.registerReceiver(requireActivity(), broadcastReceiver, new IntentFilter(Constants.INTENT_ACTION_GRANT_USB), ContextCompat.RECEIVER_NOT_EXPORTED);
 
         AlertDialog.Builder builder = new AlertDialog.Builder(requireActivity());
-        // myAlertDialog = new AlertDialog(requireActivity());
         builder.setTitle(getString(R.string.connection_lost));
         builder.setIcon(android.R.drawable.ic_dialog_alert);
         builder.setPositiveButton(android.R.string.ok, (dialog, which) -> { });
         myAlertDialog = builder.create();
-        // wakeLock.acquire(10 * 60 * 1000L);  // 10 minutes
     }
 
     @Override
     public void onStop() {
         Log.i("ECB", "TerminalFragment.onStop()");
-        //requireActivity().unregisterReceiver(broadcastReceiver);
-        //if (service != null && !requireActivity().isChangingConfigurations()) {
-        //    service.detach();
-        //}
         super.onStop();
     }
 
@@ -298,6 +256,30 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         return view;
     }
 
+    public void verifyServer() {
+        // Request a string response from the provided URL.
+        /* TODO
+        StringRequest stringRequest = new StringRequest(
+                Request.Method.GET,
+                ServerUrl + "ack=1",
+                response -> {
+                    try {
+                        receiveText.append(getText(R.string.server_ok));
+                        receiveText.append(" \n");
+                    } catch (Exception e) {
+                        receiveText.append("Error checking for internet connection\n");   // "Exception " + response);
+                    }
+                },
+                error -> receiveText.append("Internet error\n")  //+ error + "\n")
+        );
+        queue.add(stringRequest);
+        // Update cached date
+        LocalDate d = LocalDate.now();
+        year = d.getYear();
+        month = d.getMonthValue();
+        day = d.getDayOfMonth();
+        */
+    }
     @Override
     public void onCreateOptionsMenu(@NonNull Menu menu, MenuInflater inflater) {
         inflater.inflate(R.menu.menu_terminal, menu);
@@ -319,8 +301,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
      * Serial + UI
      */
     public void connect() {
-        eScanOk = false;
-        eScan2Ok = false;
         UsbDevice device = null;
         UsbManager usbManager = (UsbManager) requireActivity().getSystemService(Context.USB_SERVICE);
         for (UsbDevice v : usbManager.getDeviceList().values()) {
@@ -389,8 +369,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private void disconnect() {
         Log.i("ECB", "TerminalFragment.disconnect()");
-        eScanOk = false;
-        eScan2Ok = false;
         connected = Connected.False;
         if (usbIoManager != null) {
             usbIoManager.setListener(null);
@@ -409,8 +387,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private void SendBytes(byte[] data) {
         if (connected != Connected.True) {
-            Log.e("ECB", "TerminalFragment.SendBytes() not connected");
-            Toast.makeText(getActivity(), "not connected", Toast.LENGTH_SHORT).show();
+            Log.e("ECB", "send() not connected");
+            Toast.makeText(getActivity(), getString(R.string.no_contact), Toast.LENGTH_LONG).show();
             return;
         }
         try {
@@ -422,21 +400,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
     }
 
-    private void send(String str) {
+    private void SendString(String str) {
         str = str + "\r\n";
-        if (connected != Connected.True) {
-            Log.e("ECB", "send() not connected");
-            Toast.makeText(getActivity(), getString(R.string.no_contact), Toast.LENGTH_LONG).show();
-            return;
-        }
-        try {
-            Log.i("ECB", "send() '"+str.trim()+"'");
-            byte[] data = (str).getBytes();
-            service.write(data);
-        } catch (Exception e) {
-            Log.e("ECB", "send() exception on service.write");
-            status(e.getMessage());
-        }
+        SendBytes(str.getBytes(StandardCharsets.UTF_8));
     }
 
 
@@ -451,18 +417,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         adb.show();
     }
 
-    public void ShowWarning() {
-        Log.i("ECB", "ShowWarning()");
-        /*
-        AlertDialog.Builder adb = new AlertDialog.Builder(requireActivity());
-            adb.setTitle(getString(R.string.connection_lost));
-            adb.setIcon(android.R.drawable.ic_dialog_alert);
-            adb.setPositiveButton(android.R.string.ok, (dialog, which) -> { });
-        adb.show();
-         */
-        myAlertDialog.show();
-    }
-
     public void onSpool() {
         if (noWeb) {
             Log.e("ECB", "onSpool() - no web connection");
@@ -473,7 +427,28 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         adb.setIcon(android.R.drawable.ic_dialog_alert);
         adb.setPositiveButton(android.R.string.ok, (dialog, which) -> {
             // Spool last race
-            //SpoolPackage(prevNo);
+            if (service.mtrOk) {
+                Log.i("ECB", "SpoolPackage called on MTR. Send /SBnnnn for n="+prevNo);
+                receiveText.append(getString(R.string.spool_from) + prevNo + "\n");
+                // Send /SBnnnn
+                byte[] data = {0x2F, 0x53, 0x42, (byte) (prevNo & 0xFF), (byte) ((prevNo >> 8) & 0xFF),
+                        (byte) ((prevNo >> 16) & 0xFF), (byte) ((prevNo >> 24) & 0xFF)};
+                SendBytes(data);
+            } else if (service.eScanOk) {
+                Log.i("ECB", "SpoolPackage on old eScan, sending /QD");
+                receiveText.append(getString(R.string.spool_all));
+                //  Send Spool all = /QD<cr><lf>
+                byte[] data = {0x2F, 0x51, 0x44, 0x0D, 0x0A};
+                SendBytes(data);
+            } else if (service.eScan2Ok) {
+                Log.i("ECB", "Spool all todays records from eScan2, sending /QM");
+                receiveText.append(getString(R.string.spool_today));
+                //  Send spool today /QM<cr><lf>
+                byte[] data = {0x2F, 0x51, 0x4D, 0x0D, 0x0A};
+                SendBytes(data);
+            } else {
+                receiveText.append(getString(R.string.no_contact));
+            }
         });
         adb.setNegativeButton(android.R.string.cancel, (dialog, which) -> {
            // Do nothing
@@ -482,8 +457,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     public void getStatus() {
-        // Log.i("ECB", "getStatus()");
-        send("/ST");
+        Log.i("ECB", "getStatus()");
+        SendString("/ST");
     }
 
     void ClearAll() {
@@ -514,177 +489,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         statusText.setText(str);
     }
 
-    private char b64(int x) {
-        if (x < 0) {
-            x = 256 + x;
-        }
-        x = x & 0x3F;
-        return b64chars[x];
-    }
-
-    private int bb(byte[] badge_buffer, int i) {
-        // Convert byte to an integer between 0 and 255
-        return (int) badge_buffer[i] & 0xff;
-    }
-
-    int CompressTag(byte[] badge_buffer, char[] compressedData) {
-        int pos = 0;
-        int i;
-        int prev_tid = 0;
-        int totalTime = 0;
-        //byte[] compressedData = new byte[256];
-        // Protocol number is in first byte
-        compressedData[pos++] = b64(49);
-        // Battery voltage, 1 character (x=0..63 = voltage/0.1 = 0..6.3. Default to max
-        int bv = 63;
-        compressedData[pos++] = b64(bv);
-        // Measured time, 5 char, year modulo 16, |YYYYMM|MMDDDD|DHHHHH|MMMMMM|SSSSSS
-        // WRONG: Year is years after 1900 mod 16, so 2022 is 10 (0xA). Add 2012
-        // buf[8] bits 2..7 is year mod 16, so 2026 is 10. Add 2016.
-        // Month is 0-11
-        compressedData[pos++] =
-                b64((((bb(badge_buffer, 8) + 1900) & 0x0F) << 2) + ((bb(badge_buffer, 9) >> 2) & 3));
-        compressedData[pos++] =
-                b64((((bb(badge_buffer, 9)) & 3) << 4) + ((bb(badge_buffer, 10) >> 1) & 0x0F));
-        compressedData[pos++] =
-                b64(((bb(badge_buffer, 10) & 1) << 5) + (bb(badge_buffer, 11) & 31));
-        compressedData[pos++] =
-                b64(bb(badge_buffer, 12) & 0x3f);  // Minutes
-        compressedData[pos++] =
-                b64(bb(badge_buffer, 13) & 0x3f);  // Seconds
-        // Number of controls (filled in later)
-        compressedData[pos++] = b64(0);
-        // Badge number
-        //    3       2      1     0
-        // |cccccc|ccbbbb|bbbbaa|aaaaaa|
-        compressedData[pos++] =
-                b64(bb(badge_buffer, 20) & 0x3F);
-        compressedData[pos++] =
-                b64(((bb(badge_buffer, 20) >> 6) & 0x03) | ((bb(badge_buffer, 21) & 0x0f) << 2));
-        compressedData[pos++] =
-                b64(((bb(badge_buffer, 21) >> 4) & 0x0f) | ((bb(badge_buffer, 22) & 0x03) << 4));
-        compressedData[pos++] =
-                b64(((bb(badge_buffer, 22) >> 2) & 0x3f));
-        // Control codes
-        for (i = 0; i < 50; i++) {
-            int post = bb(badge_buffer, 3 * i + 26);
-            int controlTime = (bb(badge_buffer, 27 + 3 * i) & 0xFF) + ((bb(badge_buffer, 28 + 3 * i) & 0xFF) << 8);
-            int tid = controlTime - prev_tid;
-            prev_tid = controlTime;
-            if (i > 0 && post == 0) break;
-            if (tid <= 511) {
-                // |0ttttt|ttttpp|pppppp|
-                compressedData[pos++] = b64((tid >> 4) & 0x1f);
-            } else {
-                // |1ttttt|tttttt|ttttpp|pppppp|
-                compressedData[pos++] = b64(32 | ((tid >> 10) & 0x1F));
-                compressedData[pos++] = b64(((tid >> 4) & 0x3F));
-            }
-            compressedData[pos++] = b64(((post >> 6) & 0x03) | ((tid & 0x0f) << 2));
-            compressedData[pos++] = b64((post & 0x3F));
-            if (post < 250) {
-                totalTime = controlTime;
-            }
-        }
-
-        // Number of controls is stored at offset 7
-        compressedData[7] = b64(i);
-
-        // Add 2 character checksum on data part
-        int checksum = 0;
-        for (int j = 0; j < pos; j++) {
-            checksum += compressedData[j];
-        }
-        compressedData[pos++] = b64(checksum & 0x3F);
-        compressedData[pos++] = b64((checksum >> 6) & 0x3F);
-        compressedData[pos] = 0; //String termination
-        return totalTime;
-    }
-
-    public static String getTagValue(String xml, String tagName) {
-        return xml.split("<" + tagName + ">")[1].split("</" + tagName + ">")[0];
-    }
-
-    public void getUrlContent(String url) {
-        /*
-        // Request a string response from the provided URL.
-        StringRequest stringRequest = new StringRequest(
-                Request.Method.GET,
-                url,
-                response -> {
-                    try {
-                        Log.i("ECB","Got HTTP response, name="+ getTagValue(response, "name"));
-                        receiveText.append("Klasse:" + getTagValue(response, "class") + " ");
-                        int failed = Integer.parseInt(getTagValue(response, "failed"));
-                        if (failed == 0) {
-                            receiveText.append("Godkjent\n");
-                        } else if (failed > 0) {
-                            receiveText.append("Feil post " + failed + "\n");
-                        } else {
-                            receiveText.append("\n");
-                        }
-                        receiveText.append("Navn:" + getTagValue(response, "name") + "\n");
-                    } catch (Exception e) {
-                        receiveText.append("\nException " + e + "\n");
-                    }
-                    // Blank line between reports
-                    receiveText.append("\n");
-                },
-                error -> receiveText.append("Error in web response\n")
-        );
-        queue.add(stringRequest);
-         */
-        HttpURLConnection urlConnection = null;
-        try {
-            URL urlc = new URL(url);
-            urlConnection = (HttpURLConnection) urlc.openConnection();
-            urlConnection.setRequestMethod("GET");
-            urlConnection.setRequestProperty("Content-Type", "application/json; utf-8");
-            urlConnection.setDoOutput(true);
-            urlConnection.setConnectTimeout(3000);
-            urlConnection.setReadTimeout(3000);
-
-            int responseCode = urlConnection.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                Log.i("ECB","Got HTTP response, "+ responseCode);
-            } else {
-                Log.i("ECB", "Wrong response code: "+responseCode);
-            }
-        } catch (Exception e) {
-            Log.e("ECB", "Got exception in getUrlContent, ", e);
-        } finally {
-            if (urlConnection != null) {
-                urlConnection.disconnect();
-            }
-        }
-
-    }
-
-    public void verifyServer() {
-        // Request a string response from the provided URL.
-        /* TODO
-        StringRequest stringRequest = new StringRequest(
-                Request.Method.GET,
-                ServerUrl + "ack=1",
-                response -> {
-                    try {
-                        receiveText.append(getText(R.string.server_ok));
-                        receiveText.append(" \n");
-                    } catch (Exception e) {
-                        receiveText.append("Error checking for internet connection\n");   // "Exception " + response);
-                    }
-                },
-                error -> receiveText.append("Internet error\n")  //+ error + "\n")
-        );
-        queue.add(stringRequest);
-        // Update cached date
-        LocalDate d = LocalDate.now();
-        year = d.getYear();
-        month = d.getMonthValue();
-        day = d.getDayOfMonth();
-        */
-    }
-
     /*
      * starting with Android 14, notifications are not shown in notification bar by default when App is in background
      */
@@ -713,7 +517,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         status((String) getText(R.string.usb_connected));
         ((Activity) requireContext()).getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         connected = Connected.True;
-        //getStatus();
     }
 
     @Override
@@ -756,7 +559,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public void onSerialIoError(Exception e) {
         Log.e("ECB", "onSerialIoError()");
         status((String) getText(R.string.connection_lost));
-        ShowWarning();
+        myAlertDialog.show();
         ((Activity) requireContext()).getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         disconnect();
     }

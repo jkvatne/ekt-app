@@ -18,32 +18,19 @@
     <string name="status">"Status"</string>
     <string name="escan_sts">"eScan OK %s, Bat:%s%%, %s"</string>
     <string name="no_contact">"Ikke kontakt med avleser. Ta ut og plugg inn på nytt"</string>
-    <string name="update_mtr_clock">"Oppdaterer MTR klokke\n"</string>
+    <string name="update_mtr_clock">"MTR klokke feil\n"</string>
     <string name="mtr_clock_ok">"MTR klokke OK\n\n"</string>
-    <string name="spool_all">"Henter alle avlesninger (/QD)\n"</string>
-    <string name="spool_today">"Henter alle dagens avlesninger (/QM)\n"</string>
+    <string name="spool_all">"Henter alle (/QD)\n"</string>
+    <string name="spool_today">"Henter alle dagens (/QM)\n"</string>
     <string name="spool_from">"Henter pakker fra nr."</string>
     <string name="all_deleted">"Alle data er slettet\n"</string>
     <string name="clock_is_updated">"Klokken er nå oppdatert\n"</string>
     <string name="date_is_updated">"Dato er nå oppdatert\n"</string>
     <string name="unknown_package">"Ukjent pakke med %d tegn\n"</string>
-    <string name="wrong_protocol">"Wrong protocol on eScan. Please change to Normal\n"</string>
+    <string name="wrong_protocol">"Feil protocol på eScan. Må endres til Normal\n"</string>
     <string name="empty_message">"Empty message - no controls, tag=%d from=%d rno=%d\n"</string>
     <string name="last_count">"Siste løp har %d brikker\n"</string>
     <string name="badge_message">"Badge message tag=%d from=%d rno=%d"</string>
     <string name="insert_cable">"Sett inn USB kabel"</string>
     <string name="connected_ok">"USB tilkobling ok\n"</string>
-    <string name="status_received">"eScan2 status mottatt\n"</string>
-    <!-- BLE -->
-    <string name="ble_not_supported">Bluetooth LE is not supported on this phone</string>
-    <string name="turning_ble_on">Trying to turn on Bluetooth</string>
-    <string name="ble_connecting">Device found, connecting&#8230;</string>
-    <string name="ble_data_received">Communication OK</string>
-    <string name="ble_device_not_found">Device not found</string>
-    <string name="ble_lost_connection">Connection lost</string>
-    <string name="downloading">Downloading</string>
-    <string name="ble_not_used">Bluetooth is not used</string>
-    <string name="disconnected">Disconnected</string>
-    <string name="ble_scan">Scan</string>
-
 </resources>

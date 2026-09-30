@@ -16,6 +16,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -54,7 +55,6 @@ public class SerialService extends Service implements SerialListener {
     private String ecbTime = "";
     private String ecbDate = "";
     private String messNo = "";
-    private boolean statusOk;
     private String ServerUrl = "<loaded from apikey.properties by gradle>";
     ToneGenerator toneGen = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
     private static final char[] b64chars = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
@@ -83,7 +83,6 @@ public class SerialService extends Service implements SerialListener {
             urlConnection.setDoOutput(true);
             urlConnection.setConnectTimeout(3000);
             urlConnection.setReadTimeout(3000);
-
             int responseCode = urlConnection.getResponseCode();
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 Log.i("ECB","Got HTTP response, "+ responseCode);
@@ -97,7 +96,6 @@ public class SerialService extends Service implements SerialListener {
                 urlConnection.disconnect();
             }
         }
-
     }
 
     private char b64(int x) {
@@ -232,7 +230,6 @@ public class SerialService extends Service implements SerialListener {
                 }
             }
             if (ecbTime.length()>4) {
-                statusOk = true;
                 onSerialStatus( getString(R.string.escan_sts, ecbTime.substring(0, ecbTime.length() - 4), batterySts, messNo));
             }
         } else if (id == '/') {
@@ -246,10 +243,9 @@ public class SerialService extends Service implements SerialListener {
         } else if (id == 'N') {
             int tStart = 0;
             int n = 0;
-            int no = 0;
+            int no;
             byte[] buf = new byte[256];
             Log.i("ECB","Badge message");
-            int start = cBuf.nextGet;
             while (!cBuf.isEmpty() && cBuf.last() != 0x03 && cBuf.last() != 0x00 && cBuf.last()!=0x02) {
                 n++;
                 if (n>260) {
@@ -368,6 +364,18 @@ public class SerialService extends Service implements SerialListener {
         }
     }
 
+    private void send(String str) {
+        str = str + "\r\n";
+        try {
+            Log.i("ECB", "send() '"+str.trim()+"'");
+            byte[] data = (str).getBytes();
+            write(data);
+        } catch (Exception e) {
+            Log.e("ECB", "send() exception on service.write");
+            onSerialProgress(e.getMessage());
+        }
+    }
+
     private void receiveMtr(byte[] data) {
         for (byte datum : data) {
             cBuf.put(datum);
@@ -382,24 +390,23 @@ public class SerialService extends Service implements SerialListener {
             if (CurrentSize == 230) {
                 char[] compressedData = new char[256];
                 int totalTime = CompressTag(buf, compressedData);
-
-                //receiveText.append(String.format(Locale.ROOT, "%02d-%02d-%02d %02d:%02d:%02d ",
-                //        buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
+                onSerialProgress(String.format(Locale.ROOT, "EKT %02d-%02d-%02d %02d:%02d:%02d ",
+                        buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
 
                 int ektNo = ((int) buf[20] & 0xFF) + (((int) buf[21] & 0xFF) << 8) + (((int) buf[22] & 0xFF) << 16);
-                //receiveText.append(String.format(Locale.ROOT, "Nr %d %d:%02d\n", ektNo,
-                //        totalTime / 60, totalTime % 60));
+                onSerialProgress(String.format(Locale.ROOT, "Nr %d %d:%02d\n", ektNo,
+                        totalTime / 60, totalTime % 60));
                 String url =  ServerUrl + "a=" + String.valueOf(compressedData);
                 getUrlContent(url);
             } else if (CurrentSize == 55) {
-                //status("MTR ok");
-                //receiveText.append(String.format(Locale.ROOT, "Status 20%02d-%02d-%02d %02d:%02d:%02d\n",
-                //        buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
+                onSerialStatus("MTR ok");
+                onSerialProgress(String.format(Locale.ROOT, "Status 20%02d-%02d-%02d %02d:%02d:%02d\n",
+                        buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
                 int recNo = ((int) buf[17] & 0xFF) + (((int) buf[18] & 0xFF) << 8)
                         + (((int) buf[19] & 0xFF) << 16)+(((int) buf[20] & 0xFF) << 24);
                 int prevNo = ((int) buf[25] & 0xFF) + (((int) buf[26] & 0xFF) << 8)
                         + (((int) buf[27] & 0xFF) << 16)+(((int) buf[28] & 0xFF) << 24);
-                // receiveText.append(getString(R.string.last_count, recNo-prevNo+1));
+                onSerialProgress(getString(R.string.last_count, recNo-prevNo+1));
 
                 // Get current time and compare
                 LocalDateTime t = LocalDateTime.now();
@@ -415,20 +422,19 @@ public class SerialService extends Service implements SerialListener {
                 }
                 if (y!=buf[8] || mo!=buf[9] || d!=buf[10] || h!=buf[11] || mi!=buf[12] || diff>2) {
                     // receiveText.append(getString(R.string.update_mtr_clock));
-                    // send("/SC"+(char)y+(char)mo+(char)d+(char)h+(char)mi+(char)s);
+                    send("/SC"+(char)y+(char)mo+(char)d+(char)h+(char)mi+(char)s);
                     try { MILLISECONDS.sleep(100);} catch (Exception ignored) {}
                 } else {
-                    //receiveText.append(getString(R.string.mtr_clock_ok));
+                    onSerialProgress(getString(R.string.mtr_clock_ok));
                 }
             } else if (CurrentSize > 0) {
-                //receiveText.append(getString(R.string.unknown_package, CurrentSize));
+                onSerialProgress(getString(R.string.unknown_package, CurrentSize));
             }
         }
     }
 
     private void receive(byte[] data) {
         lastMessageMs = android.os.SystemClock.elapsedRealtime();
-            //onSerialProgress("Got message\n");
             if (eScanOk || eScan2Ok) {
                 receiveEcb(data);
             } else if (mtrOk) {
@@ -453,31 +459,6 @@ public class SerialService extends Service implements SerialListener {
         byte[] data = {0x2F, 0x47, 0x42, (byte) (no & 0xFF), (byte) ((no >> 8) & 0xFF), (byte) ((no >> 16) & 0xFF),
                 (byte) ((no >> 24) & 0xFF)};
         //SendBytes(data);
-    }
-
-    // SpoolPackage will read all records starting at given number from the MTR3/4.
-    void SpoolPackage(int no) {
-        if (mtrOk) {
-            Log.i("ECB", "SpoolPackage mtr called");
-            //receiveText.append(getString(R.string.spool_from) + no + "\n");
-            // Send /SBnnnn
-            byte[] data = {0x2F, 0x53, 0x42, (byte) (no & 0xFF), (byte) ((no >> 8) & 0xFF),
-                    (byte) ((no >> 16) & 0xFF), (byte) ((no >> 24) & 0xFF)};
-            //SendBytes(data);
-        } else if (eScanOk) {
-            Log.i("ECB", "SpoolPackage eScan called");
-            //receiveText.append(getString(R.string.spool_all));
-            //  Send Spool all = /QD<cr><lf>
-            byte[] data = {0x2F, 0x51, 0x44, 0x0D, 0x0A};
-            //SendBytes(data);
-        } else if (eScan2Ok) {
-            Log.i("ECB", "Spool all todays records from eScan2");
-            //receiveText.append(getString(R.string.spool_today));
-            //  Send spool today /QM<cr><lf>
-            byte[] data = {0x2F, 0x51, 0x4D, 0x0D, 0x0A};
-            //SendBytes(data);
-        }
-        Log.i("ECB", "SpoolPackage done");
     }
 
     @Override
@@ -531,6 +512,9 @@ public class SerialService extends Service implements SerialListener {
         ServerUrl = new String(buf, StandardCharsets.UTF_8);
         cBuf = new CircularBuffer(20480);
         createNotificationChannel();
+        mtrOk = false;
+        eScanOk = false;
+        eScan2Ok = false;
     }
 
     public SerialService() {
@@ -559,6 +543,9 @@ public class SerialService extends Service implements SerialListener {
         socket.connect(this);
         this.socket = socket;
         connected = true;
+        mtrOk = false;
+        eScanOk = false;
+        eScan2Ok = false;
     }
 
     public void disconnect() {
@@ -569,6 +556,9 @@ public class SerialService extends Service implements SerialListener {
             socket.disconnect();
             socket = null;
         }
+        mtrOk = false;
+        eScanOk = false;
+        eScan2Ok = false;
     }
 
     public void write(byte[] data) throws IOException {
@@ -647,6 +637,8 @@ public class SerialService extends Service implements SerialListener {
         Log.i("ECB","cancelNotification for SerialService");
         stopForeground(true);
     }
+
+
 
     /**
      * SerialListener
@@ -736,20 +728,21 @@ public class SerialService extends Service implements SerialListener {
         }
     }
 
-public void onSerialStatus(String s) {
-    Log.i("ECB","onSerialStatus "+s);
-    if(connected) {
-        synchronized (this) {
-            if (listener != null) {
-                mainLooper.post(() -> {
-                    if (listener != null) {
-                        listener.onSerialStatus(s);
-                    }
-                });
-            } else {
-                Log.e("ECB", "onSerialStatus: No listener");
+    public void onSerialStatus(String s) {
+        Log.i("ECB","onSerialStatus "+s);
+        if(connected) {
+            synchronized (this) {
+                if (listener != null) {
+                    mainLooper.post(() -> {
+                        if (listener != null) {
+                            listener.onSerialStatus(s);
+                        }
+                    });
+                } else {
+                    Log.e("ECB", "onSerialStatus: No listener");
+                }
             }
         }
     }
-}
+
 }
