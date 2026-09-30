@@ -158,19 +158,19 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 long elapsedMs = android.os.SystemClock.elapsedRealtime();
                 if (lastMessageMs!=0) {
                     if (elapsedMs>(lastMessageMs+600000)) {  // OBS SHould be 6000 for 6 sec timout
-                        Log.e("ECB",">>>>>>>>>>>>> Timeout, no data <<<<<<<<<<<<<<<<");
-                        lastMessageMs = 0;
-                        status((String) getText(R.string.connection_lost));
-                        disconnect();
-                        statusOk = false;
+                        // Log.e("ECB",">>>>>>>>>>>>> Timeout, no data <<<<<<<<<<<<<<<<");
+                        // lastMessageMs = 0;
+                        // status((String) getText(R.string.connection_lost));
+                        // disconnect();
+                        // statusOk = false;
                     }
                 }
             }
         }, delay);
 
         // Create the WakeLock
-        Log.i("ECB","TerminalFragment onCreate. Aquire wakeLock");
         /*
+        Log.i("ECB","TerminalFragment onCreate. Aquire wakeLock");
         PowerManager powerManager = (PowerManager) getSystemService(getContext(), POWER_SERVICE);
         PowerManager.WakeLock wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
                 "MyApp::SerialListenerWakeLock");
@@ -473,7 +473,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         adb.setIcon(android.R.drawable.ic_dialog_alert);
         adb.setPositiveButton(android.R.string.ok, (dialog, which) -> {
             // Spool last race
-            SpoolPackage(prevNo);
+            //SpoolPackage(prevNo);
         });
         adb.setNegativeButton(android.R.string.cancel, (dialog, which) -> {
            // Do nothing
@@ -484,308 +484,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public void getStatus() {
         // Log.i("ECB", "getStatus()");
         send("/ST");
-    }
-
-    private void receiveEcb(byte[] data) {
-        int messLen;
-        int ektNo;
-        int tagNo=0;
-        int eScanCtrlNo = 0;
-        int recordNo = 0;
-        int protocolType = 0;
-        // Copy data into circular buffer
-        for (byte c : data) {
-            cBuf.put(c);
-        }
-        // Move to 0x02 (STX) if possible
-        while ((!cBuf.isEmpty()) && (cBuf.peek(0) != 0x02)) {
-            cBuf.get();
-        }
-        if (cBuf.isEmpty()) return;
-        // Search for end of message (ETX = 0x03)
-        boolean ok = false;
-        for (messLen = 0; messLen < cBuf.length(); messLen++) {
-            if (cBuf.peek(messLen) == 0x03) {
-                ok = true;
-                break;
-            }
-        }
-        if (!ok) return;
-        // We now have a message ready, with length messLen
-        byte id;
-        cBuf.skip(1);    // Get STX and ignore it
-        id = cBuf.get();    // get first char
-        if (id == 'I') {
-            Log.i("ECB","Status message");
-            toneGen.startTone(ToneGenerator.TONE_CDMA_PIP,100);
-            while (!cBuf.isEmpty() && cBuf.peek(0) >= 0x20) {
-                byte ch = cBuf.peek(0);
-                String s = cBuf.getString();
-                if (s.isEmpty()) break;
-                if (ch == 'A') {
-                    batterySts = s.substring(s.length()-4);
-                    if (batterySts.charAt(0)=='-') batterySts = batterySts.substring(1);
-                    if (batterySts.endsWith("B")) {
-                        batterySts = batterySts.substring(0, batterySts.length()-1);
-                    }
-                } else if (ch == 'W') {
-                    ecbTime = s.substring(1);
-                } else if (ch == 'U') {
-                    ecbDate = s.substring(1);
-                } else if (ch == 'M') {
-                    messNo = s.substring(1);
-                }
-            }
-            if (ecbTime.length()>4) {
-                if (!statusOk) {
-                    receiveText.append(getString(R.string.status_received));
-                    myAlertDialog.dismiss();
-                }
-                statusOk = true;
-                statusText.setText(getString(R.string.escan_sts,
-                        ecbDate, ecbTime.substring(0,ecbTime.length()-4), batterySts, messNo));
-            }
-        } else if (id == '/') {
-            while (true) {
-                byte b = cBuf.get();
-                if (b==10 || b==0) {
-                    break;
-                }
-            }
-
-        } else if (id == 'N') {
-            int tStart = 0;
-            int n = 0;
-            int no = 0;
-            byte[] buf = new byte[256];
-            Log.i("ECB","Badge message");
-            int start = cBuf.nextGet;
-            while (!cBuf.isEmpty() && cBuf.last() != 0x03 && cBuf.last() != 0x00 && cBuf.last()!=0x02) {
-                n++;
-                if (n>260) {
-                    Log.e("ECB", "Hanging in receiveEcb()");
-                    cBuf.clear();
-                    break;
-                }
-                byte b = cBuf.last();
-                if (b == 'N') {
-                    // N  is the custom tag number, normally equal to the internal, permanent tag number
-                    cBuf.skip(1);
-                    ektNo = cBuf.parseInt();
-                    buf[20] = (byte) (ektNo & 0xFF);
-                    buf[21] = (byte) ((ektNo >> 8) & 0xFF);
-                    buf[22] = (byte) ((ektNo >> 16) & 0xFF);
-                } else if (b == '/') {
-                    while (b!=10 && b!=0) {
-                        b = cBuf.last();
-                    }
-                } else if (b == 'M') {
-                    // M is Tag passing number (eScan record number, starting at 0 for a new race)
-                    cBuf.skip(1);
-                    recordNo = cBuf.parseInt();
-                } else if (b == 'C') {
-                    // Control code of the eScan reader, typically 250.
-                    cBuf.skip(1);
-                    eScanCtrlNo = cBuf.parseInt();
-                } else if (b == 'L') {
-                    // Emitag version, skip the text (0120)
-                    cBuf.getString();
-                } else if (b == 'X') {
-                    // Protocol type 0-7
-                    cBuf.skip(1);
-                    protocolType = cBuf.parseInt();
-                } else if (b == 'V') {
-                    // Power information, just skip it
-                    cBuf.getString();
-                } else if (b == 'S') {
-                    // S is the permanent tag number/serial number. Normally equal to the custom tag number.
-                    cBuf.skip(1);
-                    // N or S is the ekt number
-                    tagNo = cBuf.parseInt();
-                    buf[20] = (byte) (tagNo & 0xFF);
-                    buf[21] = (byte) ((tagNo >> 8) & 0xFF);
-                    buf[22] = (byte) ((tagNo >> 16) & 0xFF);
-                } else if (b == 'W') {
-                    cBuf.skip(1);
-                    // Time when badge was read
-                    buf[8] = (byte) (year - 1900);
-                    buf[9] = (byte) month;
-                    buf[10] = (byte) day;
-                    buf[11] = (byte) cBuf.parseInt();  // hr
-                    cBuf.found((byte) ':');
-                    buf[12] = (byte) cBuf.parseInt();  // min
-                    cBuf.found((byte) ':');
-                    buf[13] = (byte) cBuf.parseInt();  // sec
-                    cBuf.found((byte) '.');
-                    // Skip milliseconds
-                    cBuf.getNumeric();
-                } else if (b == 'U') {
-                    cBuf.skip(1);
-                    // Date, i.e. 21.01.2021
-                    day = cBuf.parseInt();
-                    cBuf.skip(1);  // Skip "."
-                    month = cBuf.parseInt();
-                    cBuf.skip(1);  // Skip "."
-                    year = cBuf.parseInt();
-                } else if (b == 'P') {
-                    // Punching data for one control
-                    cBuf.skip(1);
-                    no = cBuf.parseInt();
-                    cBuf.skip(1);  // Skip "-"
-                    int control = cBuf.parseInt();
-                    cBuf.skip(1);  // Skip "-"
-                    int hrs = cBuf.parseInt();
-                    cBuf.skip(1);  // Skip ":"
-                    int min = cBuf.parseInt();
-                    cBuf.skip(1);  // Skip ":"
-                    int sec = cBuf.parseInt();
-                    cBuf.skip(1);  // Skip "."
-                    //int milliSecond = cBuf.parseInt();
-                    // Save data to buffer
-                    buf[3 * no + 26] = (byte) control;
-                    int t = sec + min * 60 + hrs * 3600;
-                    if (no == 0) tStart = t;
-                    buf[3 * no + 27] = (byte) ((t - tStart) & 0xFF);
-                    buf[3 * no + 28] = (byte) (((t - tStart) >> 8) & 0xFF);
-
-                } else {
-                    // Skip the text
-                    cBuf.getString();
-                }
-            }
-            Log.i("ECB",getString(R.string.badge_message, tagNo, eScanCtrlNo, recordNo));
-
-            char[] compressedData = new char[256];
-            int totalTime = CompressTag(buf, compressedData);
-            if (protocolType>0) {
-                receiveText.append(getString(R.string.wrong_protocol));
-            }
-            if (n == 0) {
-                receiveText.append(getString(R.string.empty_message,  tagNo, eScanCtrlNo, recordNo));
-                Log.e("ECB",getString(R.string.empty_message, tagNo, eScanCtrlNo, recordNo));
-            } else {
-                ektNo = ((int) buf[20] & 0xFF) + (((int) buf[21] & 0xFF) << 8) + (((int) buf[22] & 0xFF) << 16);
-                receiveText.append(String.format(Locale.ROOT, "%02d:%02d:%02d: Tag %7d %3d:%02d\n",
-                        buf[11], buf[12], buf[13], ektNo, totalTime / 60, totalTime % 60));
-                String url = ServerUrl + "a=" + String.valueOf(compressedData);
-                url = url.trim();
-                Log.i("ECB","Url="+url+"\n");
-                getUrlContent(url);
-            }
-        }
-    }
-
-    private void receiveMtr(byte[] data) {
-        for (byte datum : data) {
-            cBuf.put(datum);
-        }
-        if (cBuf.foundMessage()) {
-            byte[] buf = new byte[256];
-            int CurrentSize;
-            CurrentSize = (int) cBuf.peek(4)&0xFF;
-            for (int i = 0; i< CurrentSize+4; i++) {
-                buf[i] = cBuf.get();
-            }
-            if (CurrentSize == 230) {
-                char[] compressedData = new char[256];
-                int totalTime = CompressTag(buf, compressedData);
-
-                receiveText.append(String.format(Locale.ROOT, "%02d-%02d-%02d %02d:%02d:%02d ",
-                        buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
-
-                int ektNo = ((int) buf[20] & 0xFF) + (((int) buf[21] & 0xFF) << 8) + (((int) buf[22] & 0xFF) << 16);
-                receiveText.append(String.format(Locale.ROOT, "Nr %d %d:%02d\n", ektNo,
-                        totalTime / 60, totalTime % 60));
-                String url =  ServerUrl + "a=" + String.valueOf(compressedData);
-                getUrlContent(url);
-            } else if (CurrentSize == 55) {
-                status("MTR ok");
-                receiveText.append(String.format(Locale.ROOT, "Status 20%02d-%02d-%02d %02d:%02d:%02d\n",
-                        buf[8], buf[9], buf[10], buf[11], buf[12], buf[13]));
-                int recNo = ((int) buf[17] & 0xFF) + (((int) buf[18] & 0xFF) << 8)
-                            + (((int) buf[19] & 0xFF) << 16)+(((int) buf[20] & 0xFF) << 24);
-                prevNo = ((int) buf[25] & 0xFF) + (((int) buf[26] & 0xFF) << 8)
-                        + (((int) buf[27] & 0xFF) << 16)+(((int) buf[28] & 0xFF) << 24);
-                receiveText.append(getString(R.string.last_count, recNo-prevNo+1));
-
-                // Get current time and compare
-                LocalDateTime t = LocalDateTime.now();
-                int y = t.getYear() % 100;
-                int mo = t.getMonthValue();
-                int d = t.getDayOfMonth();
-                int h = t.getHour();
-                int mi = t.getMinute();
-                int s = t.getSecond();
-                int diff = s-buf[13];
-                if (diff<0) {
-                    diff += 60;
-                }
-                if (y!=buf[8] || mo!=buf[9] || d!=buf[10] || h!=buf[11] || mi!=buf[12] || diff>2) {
-                    receiveText.append(getString(R.string.update_mtr_clock));
-                    send("/SC"+(char)y+(char)mo+(char)d+(char)h+(char)mi+(char)s);
-                    try { MILLISECONDS.sleep(100);} catch (Exception ignored) {}
-                } else {
-                    receiveText.append(getString(R.string.mtr_clock_ok));
-                }
-            } else if (CurrentSize > 0) {
-                receiveText.append(getString(R.string.unknown_package, CurrentSize));
-            }
-        }
-    }
-
-    private void receive(ArrayDeque<byte[]> dataStrings) {
-        lastMessageMs = android.os.SystemClock.elapsedRealtime();
-        for (byte[] data : dataStrings) {
-            if (eScanOk || eScan2Ok) {
-                receiveEcb(data);
-            } else if (mtrOk) {
-                receiveMtr(data);
-            } else if ((data.length>2)&&(data[0]==-1) && (data[1]==-1)) {
-                mtrOk = true;
-                receiveMtr(data);
-            } else if ((data.length>3)&&(data[0]==2)&&(data[1]=='I')&&(data[2]=='E')&&(data[3]=='S')&&(data[7]=='2')) {
-                eScan2Ok = true;
-                Log.i("ECB","received first eScan2 message");
-                receiveEcb(data);
-            } else if ((data.length>3)&&(data[0]==2)&&(data[1]=='I')&&(data[2]=='e')&&(data[3]=='S')) {
-                eScanOk = true;
-                Log.i("ECB","received first eScan1 message");
-                receiveEcb(data);
-            }
-        }
-    }
-
-    // GetPackage will read one record from the MTR3/4.
-    void GetPackage(int no) {
-        // Sending /GBxxxx with binary x
-        byte[] data = {0x2F, 0x47, 0x42, (byte) (no & 0xFF), (byte) ((no >> 8) & 0xFF), (byte) ((no >> 16) & 0xFF),
-                (byte) ((no >> 24) & 0xFF)};
-        SendBytes(data);
-    }
-
-    // SpoolPackage will read all records starting at given number from the MTR3/4.
-    void SpoolPackage(int no) {
-        if (mtrOk) {
-            Log.i("ECB", "SpoolPackage mtr called");
-            receiveText.append(getString(R.string.spool_from) + no + "\n");
-            // Send /SBnnnn
-            byte[] data = {0x2F, 0x53, 0x42, (byte) (no & 0xFF), (byte) ((no >> 8) & 0xFF),
-                    (byte) ((no >> 16) & 0xFF), (byte) ((no >> 24) & 0xFF)};
-            SendBytes(data);
-        } else if (eScanOk) {
-            Log.i("ECB", "SpoolPackage eScan called");
-            receiveText.append(getString(R.string.spool_all));
-            //  Send Spool all = /QD<cr><lf>
-            byte[] data = {0x2F, 0x51, 0x44, 0x0D, 0x0A};
-            SendBytes(data);
-        } else if (eScan2Ok) {
-            Log.i("ECB", "Spool all todays records from eScan2");
-            receiveText.append(getString(R.string.spool_today));
-            //  Send spool today /QM<cr><lf>
-            byte[] data = {0x2F, 0x51, 0x4D, 0x0D, 0x0A};
-            SendBytes(data);
-        }
-        Log.i("ECB", "SpoolPackage done");
     }
 
     void ClearAll() {
@@ -1030,17 +728,18 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         ArrayDeque<byte[]> dataStrings = new ArrayDeque<>();
         dataStrings.add(data);
         try {
-            receive(dataStrings);
+            //receive(dataStrings);
         } catch (Exception ignored) {
 
         }
     }
 
-    public void onSerialRead(ArrayDeque<byte[]> dataStrings) {
+    @Override
+    public void onSerialProgress(String s) {
         try {
-            receive(dataStrings);
-        } catch (Exception ignored) {
-
+            receiveText.append(s);   // "Exception " + response);
+        } catch (Exception e) {
+            Log.e("ECB", "onSerialProgress() exception "+e);
         }
     }
 

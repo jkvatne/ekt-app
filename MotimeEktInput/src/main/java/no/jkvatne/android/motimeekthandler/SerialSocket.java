@@ -108,4 +108,8 @@ public class SerialSocket implements SerialInputOutputManager.Listener {
         if (listener != null)
             listener.onSerialIoError(e);
     }
+
+    public void onSerialProgress(String s) {
+
+    }
 }
